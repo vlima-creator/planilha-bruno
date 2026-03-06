@@ -53,18 +53,9 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
         df_merged['Forma de entrega'] = df_merged['Forma de entrega'].fillna(df_merged['Forma de entrega_dev'])
     
     # Uma devolução só conta se a venda NÃO foi cancelada (se foi cancelada, é cancelamento, não devolução)
-    # Para Shopee, validamos se existe ID de devolução ou status de reembolso
-    if 'ID_Devolucao' in df_merged.columns or 'is_reembolso' in df_merged.columns:
-        df_merged['tem_dev'] = (
-            (df_merged[col_valor].notna()) & 
-            (~df_merged['is_cancelada']) & 
-            (
-                (df_merged['ID_Devolucao'].notna() if 'ID_Devolucao' in df_merged.columns else False) | 
-                (df_merged['is_reembolso'] if 'is_reembolso' in df_merged.columns else False)
-            )
-        )
-    else:
-        df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
+    # IMPORTANTE: No ML, o registro de devolução pode vir com valor 0 se o produto foi devolvido mas não houve reembolso (ex: troca ou garantia)
+    # Portanto, validamos apenas se o registro existe no mapa de devoluções e a venda não foi cancelada.
+    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
         
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
     
@@ -135,7 +126,12 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'sum'}).reset_index()
     
     df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left')
-    df_merged['tem_dev'] = df_merged[col_valor].notna()
+    # Identificar cancelamentos para consistência
+    df_merged['is_cancelada'] = False
+    if 'Estado' in df_merged.columns:
+        df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
+        
+    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
     
     col_receita = 'Receita por produtos (BRL)'
@@ -205,7 +201,12 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
         return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
 
     df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left')
-    df_merged['tem_dev'] = df_merged[col_valor].notna()
+    # Identificar cancelamentos para consistência
+    df_merged['is_cancelada'] = False
+    if 'Estado' in df_merged.columns:
+        df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
+        
+    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
     
     col_receita = 'Receita por produtos (BRL)'

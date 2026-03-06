@@ -115,6 +115,11 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
             
             if tem_dev_valida:
                 venda_com_devolucao.add(num_venda)
+            elif plataforma != 'Shopee':
+                # Para ML, se o pedido está no mapa de devoluções e não foi cancelado,
+                # ele deve contar como devolução mesmo que o filtro de 'tem_dev_valida' falhe
+                # (ex: casos de troca onde não há ID de devolução explícito mas o registro existe)
+                venda_com_devolucao.add(num_venda)
             
             # Faturamento de Devoluções = receita dos produtos que foram devolvidos
             # No ML, o valor de 'Cancelamentos e reembolsos (BRL)' já representa o valor estornado do produto
