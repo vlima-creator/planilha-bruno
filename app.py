@@ -324,8 +324,8 @@ with st.sidebar:
     st.markdown("---")
     
     st.subheader("📁 Upload de Dados")
-    file_vendas = st.file_uploader("Relatório de Vendas", type=['xlsx'], key='vendas', help="Arraste o arquivo .xlsx de vendas do ML")
-    file_devolucoes = st.file_uploader("Relatório de Devoluções", type=['xlsx'], key='devolucoes', help="Arraste o arquivo .xlsx de devoluções do ML")
+    file_vendas = st.file_uploader("Relatório de Vendas", type=['xlsx'], key='vendas', help="Arraste o arquivo .xlsx de vendas (ML ou Shopee)")
+    file_devolucoes = st.file_uploader("Relatório de Devoluções", type=['xlsx', 'xls'], key='devolucoes', help="Arraste o arquivo de devoluções (ML ou Shopee)")
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
@@ -362,6 +362,10 @@ with st.sidebar:
                 st.error(f"Erro: {str(e)}")
 
     if st.session_state.processed_data is not None:
+        st.markdown("---")
+        plataforma = st.session_state.processed_data.get('plataforma', 'ML')
+        st.success(f"Plataforma Ativa: **{plataforma}**")
+        
         st.markdown("---")
         st.subheader("⚙️ Configurações")
         visualizacao = st.radio(

@@ -25,8 +25,9 @@ def ajustar_largura_colunas(sheet):
         column = col[0].column_letter
         for cell in col:
             try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
+                if cell.value:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
             except:
                 pass
         adjusted_width = (max_length + 2)
@@ -36,19 +37,21 @@ def formatar_valores_excel(sheet, columns_monetarias, columns_percentuais):
     """Aplica formatos numéricos do Excel para valores monetários e percentuais"""
     for row in range(2, sheet.max_row + 1):
         for col in columns_monetarias:
-            cell = sheet.cell(row=row, column=col)
-            cell.number_format = 'R$ #,##0.00'
+            if col <= sheet.max_column:
+                cell = sheet.cell(row=row, column=col)
+                cell.number_format = 'R$ #,##0.00'
         for col in columns_percentuais:
-            cell = sheet.cell(row=row, column=col)
-            cell.number_format = '0.00%'
+            if col <= sheet.max_column:
+                cell = sheet.cell(row=row, column=col)
+                cell.number_format = '0.00%'
 
 def exportar_xlsx(data):
-    """Exporta os resultados para um arquivo XLSX com análises profundas e visual amigável"""
-    
+    """Exporta os resultados para um arquivo XLSX"""
     vendas = data['vendas']
     matriz = data['matriz'] if data['matriz'] is not None else pd.DataFrame()
     full = data['full'] if data['full'] is not None else pd.DataFrame()
     max_date = data['max_date']
+    plataforma = data.get('plataforma', 'ML')
     
     output = BytesIO()
     writer = pd.ExcelWriter(output, engine='openpyxl')
@@ -58,6 +61,7 @@ def exportar_xlsx(data):
     
     resumo_data = [
         ['MÉTRICA DE DESEMPENHO', 'VALOR ATUAL'],
+        ['Plataforma', plataforma],
         ['Total de Pedidos Processados', metricas_total['vendas']],
         ['Faturamento Bruto de Produtos', metricas_total['faturamento_produtos']],
         ['Faturamento Total (c/ Fretes)', metricas_total['faturamento_total']],
@@ -68,11 +72,10 @@ def exportar_xlsx(data):
         ['---', '---'],
         ['Perda Total Estimada', abs(metricas_total['perda_total'])],
         ['Perda Parcial (Custos Operacionais)', abs(metricas_total['perda_parcial'])],
-        ['Ticket Médio de Perda por Devolução', abs(metricas_total['perda_total'] / metricas_total['devolucoes_vendas']) if metricas_total['devolucoes_vendas'] > 0 else 0],
         ['---', '---'],
         ['Análise de Saúde das Devoluções', 'Quantidade'],
-        ['Devoluções Saudáveis (Reembolsadas)', metricas_total['saudaveis']],
-        ['Devoluções Críticas (Prejuízo Total)', metricas_total['criticas']],
+        ['Devoluções Saudáveis', metricas_total['saudaveis']],
+        ['Devoluções Críticas', metricas_total['criticas']],
         ['Devoluções Neutras', metricas_total['neutras']],
     ]
     
@@ -81,19 +84,23 @@ def exportar_xlsx(data):
     
     ws_resumo = writer.sheets['Resumo Executivo']
     aplicar_estilo_cabecalho(ws_resumo, 2)
-    # Formatação manual para estrutura vertical
-    for row in [3, 4, 8, 10, 11, 12]:
-        ws_resumo.cell(row=row, column=2).number_format = 'R$ #,##0.00'
-    ws_resumo.cell(row=7, column=2).number_format = '0.00%'
+    # Formatação para valores monetários e percentuais no resumo vertical
+    for row_idx, row_val in enumerate(resumo_data, 1):
+        label = row_val[0]
+        if 'Faturamento' in label or 'Perda' in label:
+            ws_resumo.cell(row=row_idx, column=2).number_format = 'R$ #,##0.00'
+        if 'Taxa' in label:
+            ws_resumo.cell(row=row_idx, column=2).number_format = '0.00%'
     ajustar_largura_colunas(ws_resumo)
 
     # 2. ABA RANKING DE SKUS (TOP 50)
-    df_skus, _ = analisar_skus(vendas, matriz, full, max_date, 180, top_n=50)
+    df_skus, _ = analisar_skus(vendas, matriz, full, max_date, 180, limit=50)
     if not df_skus.empty:
         df_skus.to_excel(writer, sheet_name='Ranking de SKUs', index=False)
         ws_skus = writer.sheets['Ranking de SKUs']
         aplicar_estilo_cabecalho(ws_skus, len(df_skus.columns))
-        formatar_valores_excel(ws_skus, [5, 6, 7], [4])
+        # Colunas: SKU, Vendas, Dev, Impacto, Taxa
+        formatar_valores_excel(ws_skus, [4], [5])
         ajustar_largura_colunas(ws_skus)
 
     # 3. ABA MOTIVOS DE DEVOLUÇÃO
@@ -111,6 +118,7 @@ def exportar_xlsx(data):
         df_frete.to_excel(writer, sheet_name='Análise de Logística', index=False)
         ws_frete = writer.sheets['Análise de Logística']
         aplicar_estilo_cabecalho(ws_frete, len(df_frete.columns))
+        # Colunas: Forma de Entrega, Vendas, Devoluções, Taxa (%), Impacto (R$)
         formatar_valores_excel(ws_frete, [5], [4])
         ajustar_largura_colunas(ws_frete)
 
@@ -121,11 +129,15 @@ def exportar_xlsx(data):
         ['Vendas: SKUs não identificados', qualidade['vendas']['sem_sku_pct'] / 100],
         ['Vendas: Datas ausentes', qualidade['vendas']['sem_data_pct'] / 100],
         ['Vendas: N.º de venda ausente', qualidade['vendas']['sem_numero_venda_pct'] / 100],
-        ['Devoluções Matriz: Sem motivo informado', qualidade['matriz']['sem_motivo_pct'] / 100],
-        ['Devoluções Matriz: Sem estado do produto', qualidade['matriz']['sem_estado_pct'] / 100],
-        ['Devoluções Full: Sem motivo informado', qualidade['full']['sem_motivo_pct'] / 100],
-        ['Devoluções Full: Sem estado do produto', qualidade['full']['sem_estado_pct'] / 100],
     ]
+    if plataforma == 'ML':
+        qualidade_rows.extend([
+            ['Devoluções Matriz: Sem motivo informado', qualidade['matriz']['sem_motivo_pct'] / 100],
+            ['Devoluções Matriz: Sem estado do produto', qualidade['matriz']['sem_estado_pct'] / 100],
+            ['Devoluções Full: Sem motivo informado', qualidade['full']['sem_motivo_pct'] / 100],
+            ['Devoluções Full: Sem estado do produto', qualidade['full']['sem_estado_pct'] / 100],
+        ])
+    
     pd.DataFrame(qualidade_rows[1:], columns=qualidade_rows[0]).to_excel(writer, sheet_name='Qualidade dos Dados', index=False)
     ws_qual = writer.sheets['Qualidade dos Dados']
     aplicar_estilo_cabecalho(ws_qual, 2)
@@ -133,7 +145,7 @@ def exportar_xlsx(data):
     ajustar_largura_colunas(ws_qual)
 
     # 6. ABA DADOS BRUTOS (VENDAS)
-    vendas_export = vendas.head(2000)
+    vendas_export = vendas.head(5000)
     vendas_export.to_excel(writer, sheet_name='Base de Vendas', index=False)
     ws_vendas = writer.sheets['Base de Vendas']
     aplicar_estilo_cabecalho(ws_vendas, len(vendas_export.columns))

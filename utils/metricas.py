@@ -1,46 +1,48 @@
 import pandas as pd
 from datetime import datetime, timedelta
 
-def classificar_estado(estado):
-    """Classifica devolução baseado no estado"""
+def classificar_estado(estado, plataforma='ML'):
+    """Classifica devolução baseado no estado e plataforma"""
     if pd.isna(estado):
         return 'Neutra'
     
     estado_lower = str(estado).lower()
     
-    # Saudável: produto foi devolvido e aceito
-    if ('colocamos o produto à venda novamente' in estado_lower or 
-        'devolvemos o produto ao comprador' in estado_lower or
-        'reembolsamos o dinheiro' in estado_lower):
-        return 'Saudável'
-    
-    # Crítica: devolução problemática ou cancelada
-    if ('cancelada' in estado_lower or 
-        'mediação' in estado_lower or
-        'reclamação' in estado_lower or
-        'revisão' in estado_lower):
-        return 'Crítica'
-    
-    # Neutra: em processo
-    return 'Neutra'
+    if plataforma == 'Shopee':
+        # Shopee Status: 'Reembolso Concluído', 'Devolução Pendente', etc.
+        if 'reembolso concluído' in estado_lower or 'concluído' in estado_lower:
+            return 'Saudável' # Assumindo que o processo foi finalizado
+        if 'disputa' in estado_lower or 'rejeitado' in estado_lower:
+            return 'Crítica'
+        return 'Neutra'
+    else:
+        # ML: Saudável: produto foi devolvido e aceito
+        if ('colocamos o produto à venda novamente' in estado_lower or 
+            'devolvemos o produto ao comprador' in estado_lower or
+            'reembolsamos o dinheiro' in estado_lower):
+            return 'Saudável'
+        
+        # ML: Crítica: devolução problemática ou cancelada
+        if ('cancelada' in estado_lower or 
+            'mediação' in estado_lower or
+            'reclamação' in estado_lower or
+            'revisão' in estado_lower):
+            return 'Crítica'
+        
+        # ML: Neutra: em processo
+        return 'Neutra'
 
 def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     """
     Calcula métricas para um período específico.
-    
-    IMPORTANTE: Esta função NÃO filtra por período internamente.
-    Os dados já devem chegar filtrados pela função aplicar_filtros() do app.py.
-    O parâmetro dias_atras é mantido apenas para compatibilidade, mas a filtragem
-    real é feita no cabeçalho global.
     """
-    
     if matriz is None:
         matriz = pd.DataFrame()
     if full is None:
         full = pd.DataFrame()
     
-    # Trabalhar com os dados como recebidos (já filtrados pelo cabeçalho global)
     vendas_periodo = vendas.copy()
+    plataforma = vendas_periodo['Plataforma'].iloc[0] if not vendas_periodo.empty else 'ML'
     
     # Criar mapa de devoluções indexado por N.º de venda
     todas_dev = pd.concat([matriz, full], ignore_index=True)
@@ -103,44 +105,35 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                 
                 # Se reembolso é 0, usar receita do produto como fallback
                 if reembolso == 0:
-                    reembolso_fallback = dev.get('Receita por produtos (BRL)', 0)
-                    if pd.isna(reembolso_fallback):
-                        reembolso_fallback = 0.0
-                    reembolso = float(reembolso_fallback)
+                    reembolso = receita_prod
                 
                 # Perda Parcial = Tarifas de envio + Tarifa de venda e impostos
-                # (você recupera o produto mas perde os custos)
                 tarifas_envio = dev.get('Tarifas de envio (BRL)', 0)
-                if pd.isna(tarifas_envio):
-                    tarifas_envio = 0.0
+                if pd.isna(tarifas_envio): tarifas_envio = 0.0
                 tarifas_envio = float(tarifas_envio)
                 
                 tarifa_venda = dev.get('Tarifa de venda e impostos (BRL)', 0)
-                if pd.isna(tarifa_venda):
-                    tarifa_venda = 0.0
+                if pd.isna(tarifa_venda): tarifa_venda = 0.0
                 tarifa_venda = float(tarifa_venda)
                 
-                # Perda parcial é a soma dos custos (já vêm negativos)
-                perda_parcial_item = tarifas_envio + tarifa_venda
+                # Perda parcial é a soma dos custos (já vêm negativos no ML)
+                perda_parcial_item = abs(tarifas_envio) + abs(tarifa_venda)
                 
-                # A perda total é o impacto real financeiro.
-                # Se a devolução for 'Saudável', o produto volta ao estoque, então a perda é apenas os custos operacionais.
-                # Se for 'Crítica', a perda é o valor total do produto mais os custos operacionais.
-                # Se for 'Neutra', assumimos conservadoramente uma perda parcial até a conclusão.
-                classe = classificar_estado(dev.get('Estado'))
+                # Lógica de perda total baseada na classificação
+                classe = classificar_estado(dev.get('Estado'), plataforma)
                 if classe == 'Saudável':
                     saudaveis += 1
-                    perda_total_item = abs(perda_parcial_item)
+                    perda_total_item = perda_parcial_item
                 elif classe == 'Crítica':
                     criticas += 1
-                    perda_total_item = abs(reembolso) + abs(perda_parcial_item)
+                    perda_total_item = abs(reembolso) + perda_parcial_item
                 else:
                     neutras += 1
-                    perda_total_item = abs(perda_parcial_item)
+                    perda_total_item = perda_parcial_item
                 
                 impacto_devolucao += abs(reembolso)
                 perda_total += perda_total_item
-                perda_parcial += abs(perda_parcial_item)
+                perda_parcial += perda_parcial_item
     
     # Contagem de devoluções = número de vendas que tiveram devolução
     devolucoes_count = len(venda_com_devolucao)
@@ -152,18 +145,19 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
         'faturamento_produtos': faturamento_produtos,
         'faturamento_total': faturamento_total,
         'devolucoes_vendas': devolucoes_count,
-        'taxa_devolucao': taxa_devolucao,  # Valor entre 0 e 1
+        'taxa_devolucao': taxa_devolucao,
         'faturamento_devolucoes': faturamento_devolucoes,
-        'impacto_devolucao': -abs(impacto_devolucao),  # Negativo (perda)
-        'perda_total': -abs(perda_total),               # Negativo (perda)
-        'perda_parcial': -abs(perda_parcial),           # Negativo (perda)
+        'impacto_devolucao': -abs(impacto_devolucao),
+        'perda_total': -abs(perda_total),
+        'perda_parcial': -abs(perda_parcial),
         'saudaveis': saudaveis,
         'criticas': criticas,
         'neutras': neutras,
+        'plataforma': plataforma
     }
 
 def calcular_qualidade_arquivo(data):
-    """Calcula qualidade dos arquivos com chaves corrigidas para o export"""
+    """Calcula qualidade dos arquivos"""
     vendas = data['vendas']
     matriz = data['matriz']
     full = data['full']
