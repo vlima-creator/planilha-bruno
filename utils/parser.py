@@ -105,7 +105,16 @@ def ler_vendas(file):
             df['Venda por publicidade'] = 'Não'
             
             # Canal na Shopee (Padrão)
-            df['Forma de entrega'] = df['Método de envio']
+            # Formato solicitado: (Método de envio + Opção de envio)
+            if 'Método de envio' in df.columns and 'Opção de envio' in df.columns:
+                df['Forma de entrega'] = df.apply(
+                    lambda x: f"{x['Método de envio']} ({x['Opção de envio']})" 
+                    if pd.notna(x['Método de envio']) and pd.notna(x['Opção de envio']) 
+                    else (x['Método de envio'] if pd.notna(x['Método de envio']) else x['Opção de envio']), 
+                    axis=1
+                )
+            else:
+                df['Forma de entrega'] = df['Método de envio']
             
         else: # ML
             if 'Data da venda' in df.columns:
@@ -147,7 +156,14 @@ def ler_devolucoes(file):
             
             # Tentar capturar forma de entrega se disponível no relatório de devoluções
             # Na Shopee, às vezes o relatório de devolução tem o canal de envio
-            if 'Método de envio' in df.columns:
+            if 'Método de envio' in df.columns and 'Opção de envio' in df.columns:
+                df['Forma de entrega'] = df.apply(
+                    lambda x: f"{x['Método de envio']} ({x['Opção de envio']})" 
+                    if pd.notna(x['Método de envio']) and pd.notna(x['Opção de envio']) 
+                    else (x['Método de envio'] if pd.notna(x['Método de envio']) else x['Opção de envio']), 
+                    axis=1
+                )
+            elif 'Método de envio' in df.columns:
                 df['Forma de entrega'] = df['Método de envio']
             
             # Valores financeiros Shopee
