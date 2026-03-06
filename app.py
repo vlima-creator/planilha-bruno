@@ -507,15 +507,15 @@ else:
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.markdown(f'<div class="chart-title">Top 5 {visualizacao}s por Devoluções</div>', unsafe_allow_html=True)
             
-            df_skus_top, _ = analisar_skus(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global, 5, agrupar_por=agrupar_por)
+            df_skus_top, _ = analisar_skus(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global, limit=5, agrupar_por=agrupar_por)
             
             if not df_skus_top.empty:
                 # Garantir que a coluna de agrupamento existe no DataFrame retornado
                 col_y = agrupar_por if agrupar_por in df_skus_top.columns else df_skus_top.columns[0]
                 
-                df_skus_top = df_skus_top.sort_values('Dev.', ascending=True)
+                df_skus_top = df_skus_top.sort_values('Dev', ascending=True)
                 fig_bar = go.Figure(go.Bar(
-                    x=df_skus_top['Dev.'], y=df_skus_top[col_y],
+                    x=df_skus_top['Dev'], y=df_skus_top[col_y],
                     orientation='h', marker_color='#f59e0b'
                 ))
                 fig_bar.update_layout(
@@ -650,7 +650,7 @@ else:
             with c2:
                 # Calcular Top 10 concentração para Matriz
                 df_skus_m, total_dev_m = analisar_skus(data['vendas'], data['matriz'], None, data['max_date'], janela_global, agrupar_por=agrupar_por)
-                top10_m = (df_skus_m.sort_values('Dev.', ascending=False).head(10)['Dev.'].sum() / total_dev_m * 100) if total_dev_m > 0 and len(df_skus_m) > 0 else 0
+                top10_m = (df_skus_m.sort_values('Dev', ascending=False).head(10)['Dev'].sum() / total_dev_m * 100) if total_dev_m > 0 and len(df_skus_m) > 0 else 0
                 st.markdown(f"""
                     <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
                         <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
@@ -659,35 +659,35 @@ else:
                 """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
-        with col_full:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #f8fafc;">Full</div>', unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_full['devolucoes_vendas'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-            with c2:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_full['taxa_devolucao'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_full['impacto_devolucao'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-            with c2:
-                df_skus_f, total_dev_f = analisar_skus(data['vendas'], None, data['full'], data['max_date'], janela_global, agrupar_por=agrupar_por)
-                top10_f = (df_skus_f.sort_values('Dev.', ascending=False).head(10)['Dev.'].sum() / total_dev_f * 100) if total_dev_f > 0 and len(df_skus_f) > 0 else 0
+            with col_full:
+                st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+                st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #f8fafc;">Full</div>', unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown(f"""
+                        <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
+                            <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
+                            <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_full['devolucoes_vendas'])}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with c2:
+                    st.markdown(f"""
+                        <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
+                            <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
+                            <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_full['taxa_devolucao'])}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown(f"""
+                        <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
+                            <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
+                            <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_full['impacto_devolucao'])}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with c2:
+                    df_skus_f, total_dev_f = analisar_skus(data['vendas'], None, data['full'], data['max_date'], janela_global, agrupar_por=agrupar_por)
+                    top10_f = (df_skus_f.sort_values('Dev', ascending=False).head(10)['Dev'].sum() / total_dev_f * 100) if total_dev_f > 0 and len(df_skus_f) > 0 else 0
                 st.markdown(f"""
                     <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
                         <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
