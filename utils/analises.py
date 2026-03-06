@@ -70,6 +70,10 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     col_valor = 'Cancelamentos e reembolsos (BRL)'
     if col_valor not in todas_dev.columns: todas_dev[col_valor] = 0.0
     
+    # CORRECAO: Filtrar apenas devolucoes com valor > 0 (devolucoes reais)
+    # Isso evita contar pedidos que aparecem no arquivo de devolucoes mas nao foram realmente devolvidos
+    todas_dev = todas_dev[todas_dev[col_valor] > 0]
+    
     agg_dict = {col_valor: 'max'}  # 'max' em vez de 'sum' para evitar duplicatas no relatório de devoluções
     if 'Forma de entrega' in todas_dev.columns:
         agg_dict['Forma de entrega'] = 'first'
