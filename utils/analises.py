@@ -70,9 +70,10 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     col_valor = 'Cancelamentos e reembolsos (BRL)'
     if col_valor not in todas_dev.columns: todas_dev[col_valor] = 0.0
     
-    # CORRECAO: Filtrar apenas devolucoes com valor > 0 (devolucoes reais)
-    # Isso evita contar pedidos que aparecem no arquivo de devolucoes mas nao foram realmente devolvidos
-    todas_dev = todas_dev[todas_dev[col_valor] > 0]
+    # CORRECAO: O Mercado Livre retorna valores NEGATIVOS para devoluções e cancelamentos.
+    # Filtrar apenas devoluções com valor != 0 (devoluções reais)
+    # Isso evita contar pedidos que aparecem no arquivo de devoluções mas não foram realmente devolvidos
+    todas_dev = todas_dev[todas_dev[col_valor] != 0]
     
     agg_dict = {col_valor: 'max'}  # 'max' em vez de 'sum' para evitar duplicatas no relatório de devoluções
     if 'Forma de entrega' in todas_dev.columns:
@@ -98,17 +99,20 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if col_valor not in df_merged.columns:
         df_merged[col_valor] = 0.0
     
-    # Uma devolução só conta se a venda NÃO foi cancelada E se o valor de reembolso é > 0
-    # (O filtro já foi aplicado em todas_dev, então se col_valor > 0, é uma devolução real)
-    df_merged['tem_dev'] = (df_merged[col_valor] > 0) & (~df_merged['is_cancelada'])
+    # Uma devolução só conta se a venda NÃO foi cancelada E se o valor de reembolso é != 0
+    # (O filtro já foi aplicado em todas_dev, então se col_valor != 0, é uma devolução real)
+    # Usar abs() porque o ML retorna valores negativos
+    df_merged['tem_dev'] = (df_merged[col_valor] != 0) & (~df_merged['is_cancelada'])
         
-    df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
+    # Converter valores negativos para positivos (padrão do ML)
+    df_merged['valor_dev'] = df_merged[col_valor].fillna(0).abs()
     
     # Se valor_dev é 0 mas tem devolução (pode ocorrer se o filtro falhar ou em casos específicos), usar receita do produto
     col_receita = 'Receita por produtos (BRL)'
     if col_receita not in df_merged.columns: df_merged[col_receita] = 0.0
     
-    df_merged.loc[(df_merged['tem_dev']) & (df_merged['valor_dev'] == 0), 'valor_dev'] = df_merged[col_receita]
+    # Garantir que valor_dev é sempre positivo
+    df_merged.loc[(df_merged['tem_dev']) & (df_merged['valor_dev'] == 0), 'valor_dev'] = df_merged[col_receita].abs()
     
     # Agrupar por forma de entrega
     col_forma = 'Forma de entrega' if 'Forma de entrega' in df_merged.columns else None
@@ -119,6 +123,11 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     # mas o pedido for uma devolução real, vamos tentar identificar o canal (Matriz/Full)
     # para não perder a informação na tabela.
     df_merged[col_forma] = df_merged[col_forma].fillna(df_merged['Forma de entrega_dev'])
+    
+    # Limpar espaços em branco nas formas de entrega ANTES de agrupar
+    if df_merged[col_forma].dtype == 'object':
+        df_merged[col_forma] = df_merged[col_forma].str.strip()
+    
     df_merged[col_forma] = df_merged[col_forma].fillna('Outros').replace(['', ' '], 'Outros')
     
     # Agrupar métricas principais
@@ -203,13 +212,15 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     if col_valor not in df_merged.columns:
         df_merged[col_valor] = 0.0
         
-    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
-    df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
+    # CORRECAO: Verificar se valor é != 0 (não apenas notna) porque ML retorna valores negativos
+    df_merged['tem_dev'] = (df_merged[col_valor] != 0) & (~df_merged['is_cancelada'])
+    # Converter para positivo
+    df_merged['valor_dev'] = df_merged[col_valor].fillna(0).abs()
     
     col_receita = 'Receita por produtos (BRL)'
     if col_receita not in df_merged.columns: df_merged[col_receita] = 0.0
     
-    df_merged.loc[(df_merged['tem_dev']) & (df_merged['valor_dev'] == 0), 'valor_dev'] = df_merged[col_receita]
+    df_merged.loc[(df_merged['tem_dev']) & (df_merged['valor_dev'] == 0), 'valor_dev'] = df_merged[col_receita].abs()
     
     df_merged['Tipo'] = df_merged['Venda por publicidade'].apply(lambda x: 'Com Publicidade' if str(x).lower() == 'sim' else 'Orgânico')
     
@@ -256,89 +267,124 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
         return df
 
     # Se todas_dev estiver vazio ou não tiver ID de venda, retornamos algo vazio mas estruturado
-    if 'N.º de venda' not in todas_dev.columns or todas_dev.empty:
-        if not vendas_periodo.empty and agrupar_por in vendas_periodo.columns:
-            res = vendas_periodo.groupby(agrupar_por).agg(
-                Vendas=('N.º de venda', 'count')
-            ).reset_index()
-            res = garantir_colunas_app(res)
-            res = res.sort_values('Vendas', ascending=False)
-            if limit: res = res.head(limit)
-            return res, 0
-        return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
-
-    # Para devoluções: usar 'max' para evitar duplicatas por múltiplos itens no mesmo pedido
-    # Verificar se col_valor existe em todas_dev antes de agrupar
-    if col_valor not in todas_dev.columns:
-        # Se não houver devoluções, retornar vendas sem devoluções
-        if not vendas_periodo.empty and agrupar_por in vendas_periodo.columns:
-            res = vendas_periodo.groupby(agrupar_por).agg(
-                Vendas=('N.º de venda', 'count')
-            ).reset_index()
-            res = garantir_colunas_app(res)
-            res = res.sort_values('Vendas', ascending=False)
-            if limit: res = res.head(limit)
-            return res, 0
-        return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
+    if todas_dev.empty or 'N.º de venda' not in todas_dev.columns:
+        return garantir_colunas_app(pd.DataFrame())
     
-    dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'max'}).reset_index()
+    # Remover duplicatas por pedido (evita contar o mesmo pedido múltiplas vezes)
+    todas_dev = todas_dev.drop_duplicates(subset=['N.º de venda'])
     
-    if 'N.º de venda' not in vendas_periodo.columns:
-        return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
-
-    df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left')
+    # CORRECAO: Filtrar devoluções com valor != 0 (não > 0) porque ML retorna valores negativos
+    todas_dev_validas = todas_dev[todas_dev[col_valor] != 0].copy()
+    
+    # Merge vendas com devoluções
+    df_merged = pd.merge(vendas_periodo, todas_dev_validas[['N.º de venda', col_valor]], on='N.º de venda', how='left')
+    
     # Identificar cancelamentos
     df_merged['is_cancelada'] = False
     if 'Estado' in df_merged.columns:
         df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
     
-    # Garantir que col_valor existe após o merge
+    # Garantir que col_valor existe
     if col_valor not in df_merged.columns:
         df_merged[col_valor] = 0.0
-        
-    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
-    df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
+    
+    # Uma devolução conta se valor != 0 e venda não foi cancelada
+    df_merged['tem_dev'] = (df_merged[col_valor] != 0) & (~df_merged['is_cancelada'])
+    # Converter para positivo
+    df_merged['valor_dev'] = df_merged[col_valor].fillna(0).abs()
     
     col_receita = 'Receita por produtos (BRL)'
     if col_receita not in df_merged.columns: df_merged[col_receita] = 0.0
     
-    df_merged.loc[(df_merged['tem_dev']) & (df_merged['valor_dev'] == 0), 'valor_dev'] = df_merged[col_receita]
+    df_merged.loc[(df_merged['tem_dev']) & (df_merged['valor_dev'] == 0), 'valor_dev'] = df_merged[col_receita].abs()
     
-    res = df_merged.groupby(agrupar_por).agg(
-        Vendas=('N.º de venda', 'count'),
-        Dev_count=('tem_dev', 'sum'),
-        Impacto_val=('valor_dev', 'sum')
-    ).reset_index()
-    
-    # Mapear para nomes esperados pelo app.py
-    res['Dev.'] = res['Dev_count']
-    res['Dev'] = res['Dev_count'] # Manter compatibilidade interna se houver
-    res['Impacto'] = res['Impacto_val'].round(2)
-    res['Taxa'] = (res['Dev.'] / res['Vendas'] * 100).round(1)
-    
-    # Colunas adicionais para evitar erros no formatar_df_skus do app.py
-    res = garantir_colunas_app(res)
-    
-    # Lógica de Risco simples para não vir zerado
-    res['Risco'] = (res['Taxa'] * res['Vendas'] / 100).round(1)
-    
-    res = res.sort_values('Dev.', ascending=False)
-    if limit:
-        res = res.head(limit)
+    # Agrupar por SKU/Produto
+    if agrupar_por in df_merged.columns:
+        res = df_merged.groupby(agrupar_por).agg(
+            Vendas=('N.º de venda', 'count'),
+            **{'Dev.': ('tem_dev', 'sum')}
+        ).reset_index()
         
-    return res, res['Dev.'].sum()
-
-def simular_reducao(vendas, matriz, full, max_date, dias_atras, reducao_pct):
-    """Simula redução de devoluções."""
-    from .metricas import calcular_metricas
-    m = calcular_metricas(vendas, matriz, full, max_date, dias_atras)
+        res['Taxa'] = (res['Dev.'] / res['Vendas'] * 100).round(1)
+        res['Impacto'] = df_merged.groupby(agrupar_por)['valor_dev'].sum().values
+        res['Reemb.'] = df_merged.groupby(agrupar_por)[col_valor].sum().abs().values
+        res['Custo Dev.'] = 0.0  # Placeholder
+        res['Risco'] = (res['Impacto'] / res['Vendas']).round(2)
+        
+        # Classificação ABC por impacto
+        if len(res) > 0:
+            impacto_total = res['Impacto'].sum()
+            res['Impacto_Acum'] = res['Impacto'].cumsum()
+            res['Impacto_Pct'] = (res['Impacto_Acum'] / impacto_total * 100).round(1)
+            
+            res['Classe'] = res['Impacto_Pct'].apply(lambda x: 'A' if x <= 80 else ('B' if x <= 95 else 'C'))
+            res = res.drop(['Impacto_Acum', 'Impacto_Pct'], axis=1)
+        
+        res = res.sort_values('Impacto', ascending=False)
+        
+        if limit:
+            res = res.head(limit)
+        
+        return garantir_colunas_app(res)
     
-    impacto_atual = abs(m['perda_total'])
-    economia = impacto_atual * (reducao_pct / 100)
-    novo_impacto = impacto_atual - economia
+    return garantir_colunas_app(pd.DataFrame())
+
+def simular_reducao(skus_data, percentual_reducao):
+    """Simula redução de devoluções."""
+    if skus_data.empty:
+        return pd.DataFrame()
+    
+    resultado = skus_data.copy()
+    
+    if 'Dev.' in resultado.columns and 'Impacto' in resultado.columns:
+        # Reduzir devoluções pelo percentual
+        reducao_dev = (resultado['Dev.'] * percentual_reducao / 100).astype(int)
+        resultado['Dev. Reduzido'] = resultado['Dev.'] - reducao_dev
+        
+        # Recalcular impacto
+        resultado['Impacto Reduzido'] = resultado['Impacto'] * (1 - percentual_reducao / 100)
+        
+        # Recalcular taxa
+        if 'Vendas' in resultado.columns:
+            resultado['Taxa Reduzida'] = (resultado['Dev. Reduzido'] / resultado['Vendas'] * 100).round(1)
+    
+    return resultado
+
+def calcular_qualidade_arquivo(data):
+    """Calcula qualidade do arquivo de dados."""
+    vendas = data.get('vendas', pd.DataFrame())
+    matriz = data.get('matriz', pd.DataFrame())
+    full = data.get('full', pd.DataFrame())
+    
+    if vendas.empty:
+        return {'qualidade': 0, 'avisos': ['Nenhum dado de vendas encontrado']}
+    
+    avisos = []
+    pontos = 100
+    
+    # Verificar colunas essenciais
+    colunas_essenciais = ['N.º de venda', 'Data da venda', 'Receita por produtos (BRL)']
+    for col in colunas_essenciais:
+        if col not in vendas.columns:
+            avisos.append(f'Coluna ausente: {col}')
+            pontos -= 10
+    
+    # Verificar dados faltantes
+    if 'Data da venda' in vendas.columns:
+        pct_faltante = vendas['Data da venda'].isna().sum() / len(vendas) * 100
+        if pct_faltante > 10:
+            avisos.append(f'{pct_faltante:.1f}% de datas faltando')
+            pontos -= 5
+    
+    # Verificar se há devoluções
+    todas_dev = pd.concat([matriz, full], ignore_index=True) if not matriz.empty or not full.empty else pd.DataFrame()
+    if todas_dev.empty:
+        avisos.append('Nenhum dado de devoluções encontrado')
+        pontos -= 20
     
     return {
-        'impacto_atual': -impacto_atual,
-        'economia': economia,
-        'novo_impacto': -novo_impacto
+        'qualidade': max(0, pontos),
+        'avisos': avisos,
+        'total_vendas': len(vendas),
+        'total_devolucoes': len(todas_dev)
     }
