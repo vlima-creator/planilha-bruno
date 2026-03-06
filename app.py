@@ -536,9 +536,20 @@ else:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.markdown('<div class="chart-title">Evolução por Janela de Tempo</div>', unsafe_allow_html=True)
         
-        janelas_list = [30, 60, 90, 120, 150, 180]
+        # Definir janelas de tempo dinamicamente com base na janela global selecionada
+        if janela_global <= 30:
+            janelas_list = [7, 15, 30]
+        else:
+            janelas_list = [30, 60, 90, 120, 150, 180]
+            
         # Filtrar janelas até a janela global selecionada
         janelas_list = [j for j in janelas_list if j <= janela_global]
+        
+        # Garantir que a janela global atual esteja sempre na lista
+        if janela_global not in janelas_list:
+            janelas_list.append(janela_global)
+            janelas_list.sort()
+            
         janelas_data_raw = []
         
         for janela in janelas_list:
