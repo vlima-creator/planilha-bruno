@@ -151,8 +151,29 @@ def ler_devolucoes(file):
                 df['Forma de entrega'] = df['Método de envio']
             
             # Valores financeiros Shopee
+            # Coluna O (15ª coluna, índice 14): Reembolso ao comprador (Impacto)
+            # Coluna R (18ª coluna, índice 17): Compensação da Shopee ou similar?
+            # O usuário mencionou O e R. Vamos tentar mapear pelo nome se possível, ou pelo índice.
+            
+            # Mapeamento por índice para garantir captura das colunas O e R
+            cols_originais = df.columns.tolist()
+            col_o = cols_originais[14] if len(cols_originais) > 14 else None
+            col_r = cols_originais[17] if len(cols_originais) > 17 else None
+            
             df['Cancelamentos e reembolsos (BRL)'] = df['Quantia total de reembolsos'].apply(limpar_valor_shopee)
-            df['Tarifas de envio (BRL)'] = 0.0 # Shopee não detalha isso aqui
+            
+            # Se colunas O e R existirem, vamos usá-las para perda parcial e total
+            if col_o:
+                df['Shopee_Col_O'] = df[col_o].apply(limpar_valor_shopee)
+            else:
+                df['Shopee_Col_O'] = 0.0
+                
+            if col_r:
+                df['Shopee_Col_R'] = df[col_r].apply(limpar_valor_shopee)
+            else:
+                df['Shopee_Col_R'] = 0.0
+                
+            df['Tarifas de envio (BRL)'] = 0.0
             df['Tarifa de venda e impostos (BRL)'] = 0.0
             
             df['Plataforma'] = 'Shopee'

@@ -119,17 +119,44 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                 # Perda parcial é a soma dos custos (já vêm negativos no ML)
                 perda_parcial_item = abs(tarifas_envio) + abs(tarifa_venda)
                 
-                # Lógica de perda total baseada na classificação
-                classe = classificar_estado(dev.get('Estado'), plataforma)
-                if classe == 'Saudável':
-                    saudaveis += 1
-                    perda_total_item = perda_parcial_item
-                elif classe == 'Crítica':
-                    criticas += 1
-                    perda_total_item = abs(reembolso) + perda_parcial_item
+                # Se for Shopee, usar colunas O e R para perdas se disponíveis
+                if plataforma == 'Shopee':
+                    # O usuário sugeriu O e R para perdas. 
+                    # Vamos assumir que R seja a perda total e O a perda parcial (ou vice-versa)
+                    # Com base no pedido, vamos mapear:
+                    val_o = dev.get('Shopee_Col_O', 0.0)
+                    val_r = dev.get('Shopee_Col_R', 0.0)
+                    
+                    if val_o > 0 or val_r > 0:
+                        # Se tivermos esses valores, eles sobressaem a lógica padrão
+                        perda_parcial_item = float(val_o)
+                        perda_total_item = float(val_r)
+                    else:
+                        # Fallback se colunas estiverem vazias
+                        classe = classificar_estado(dev.get('Estado'), plataforma)
+                        if classe == 'Saudável':
+                            perda_total_item = perda_parcial_item
+                        else:
+                            perda_total_item = abs(reembolso) + perda_parcial_item
                 else:
-                    neutras += 1
-                    perda_total_item = perda_parcial_item
+                    # Lógica ML original
+                    classe = classificar_estado(dev.get('Estado'), plataforma)
+                    if classe == 'Saudável':
+                        saudaveis += 1
+                        perda_total_item = perda_parcial_item
+                    elif classe == 'Crítica':
+                        criticas += 1
+                        perda_total_item = abs(reembolso) + perda_parcial_item
+                    else:
+                        neutras += 1
+                        perda_total_item = perda_parcial_item
+                
+                # Incrementar contadores de classe para Shopee se não foi feito acima
+                if plataforma == 'Shopee':
+                    classe = classificar_estado(dev.get('Estado'), plataforma)
+                    if classe == 'Saudável': saudaveis += 1
+                    elif classe == 'Crítica': criticas += 1
+                    else: neutras += 1
                 
                 impacto_devolucao += abs(reembolso)
                 perda_total += perda_total_item
