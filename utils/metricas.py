@@ -49,6 +49,8 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     dev_map = {}
     
     if len(todas_dev) > 0 and 'N.º de venda' in todas_dev.columns:
+        # Se for Shopee, podemos ter múltiplas entradas para o mesmo pedido no relatório de devoluções
+        # Vamos garantir que cada devolução única seja processada
         for _, row in todas_dev.iterrows():
             num_venda = str(row['N.º de venda'])
             if num_venda not in dev_map:
@@ -100,7 +102,19 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
         num_venda = str(venda.get('N.º de venda', ''))
         
         if num_venda in dev_map:
-            venda_com_devolucao.add(num_venda)
+            # Para Shopee, verificar se a devolução é válida (não é apenas um registro de cancelamento)
+            tem_dev_valida = False
+            if plataforma == 'Shopee':
+                for dev in dev_map[num_venda]:
+                    # Se tem ID de devolução ou status de reembolso, é uma devolução real
+                    if pd.notna(dev.get('ID_Devolucao')) or dev.get('is_reembolso', False):
+                        tem_dev_valida = True
+                        break
+            else:
+                tem_dev_valida = True # Para ML, assumimos que se está no mapa, é devolução
+            
+            if tem_dev_valida:
+                venda_com_devolucao.add(num_venda)
             
             # Faturamento de Devoluções = receita dos produtos que foram devolvidos
             # No ML, o valor de 'Cancelamentos e reembolsos (BRL)' já representa o valor estornado do produto

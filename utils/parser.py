@@ -154,9 +154,15 @@ def ler_devolucoes(file):
             
             # Mapear para o padrão
             df['N.º de venda'] = df['ID do pedido'].astype(str)
+            if 'ID da Devolução' in df.columns:
+                df['ID_Devolucao'] = df['ID da Devolução'].astype(str)
+            
             df['Data da venda'] = pd.to_datetime(df['Data de criação do pedido'], errors='coerce')
             df['Estado'] = df['Status da Devolução / Reembolso']
             df['Motivo do resultado'] = df['Motivo da Devolução']
+            
+            # Identificar se é um reembolso concluído ou em processo
+            df['is_reembolso'] = df['Estado'].astype(str).str.lower().str.contains('reembolso|concluído|aceito', na=False)
             
             # Tentar capturar forma de entrega se disponível no relatório de devoluções
             # Na Shopee, às vezes o relatório de devolução tem o canal de envio

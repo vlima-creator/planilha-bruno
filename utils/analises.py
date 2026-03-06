@@ -53,7 +53,19 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
         df_merged['Forma de entrega'] = df_merged['Forma de entrega'].fillna(df_merged['Forma de entrega_dev'])
     
     # Uma devolução só conta se a venda NÃO foi cancelada (se foi cancelada, é cancelamento, não devolução)
-    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
+    # Para Shopee, validamos se existe ID de devolução ou status de reembolso
+    if 'ID_Devolucao' in df_merged.columns or 'is_reembolso' in df_merged.columns:
+        df_merged['tem_dev'] = (
+            (df_merged[col_valor].notna()) & 
+            (~df_merged['is_cancelada']) & 
+            (
+                (df_merged['ID_Devolucao'].notna() if 'ID_Devolucao' in df_merged.columns else False) | 
+                (df_merged['is_reembolso'] if 'is_reembolso' in df_merged.columns else False)
+            )
+        )
+    else:
+        df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
+        
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
     
     # Se valor_dev é 0 mas tem devolução, usar receita do produto
