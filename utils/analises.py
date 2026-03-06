@@ -97,7 +97,8 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
         agrupar_por = 'SKU' if 'SKU' in vendas_periodo.columns else (vendas_periodo.columns[0] if not vendas_periodo.empty else 'SKU')
         
     col_valor = 'Cancelamentos e reembolsos (BRL)'
-    if col_valor not in todas_dev.columns: todas_dev[col_valor] = 0.0
+    if col_valor not in todas_dev.columns: 
+        todas_dev[col_valor] = 0.0
     
     # Função para garantir todas as colunas que o app.py espera
     def garantir_colunas_app(df):
@@ -124,48 +125,60 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     # Remover duplicatas por pedido (evita contar o mesmo pedido múltiplas vezes)
     todas_dev = todas_dev.drop_duplicates(subset=['N.º de venda'])
     
-    # CORRECAO: Filtrar devoluções com valor != 0 (não > 0) porque ML retorna valores negativos
+    # Filtrar devoluções com valor != 0 (não > 0) porque ML retorna valores negativos
     todas_dev_validas = todas_dev[todas_dev[col_valor] != 0].copy()
     
     # Merge vendas com devoluções
-    df_merged = pd.merge(vendas_periodo, todas_dev_validas[['N.º de venda', col_valor]], on='N.º de venda', how='left')
-    df_merged['tem_dev'] = df_merged[col_valor].notna()
-    df_merged['valor_dev'] = df_merged[col_valor].fillna(0).abs()
+    # Usamos suffixes para evitar conflitos se col_valor já existir em vendas_periodo
+    df_merged = pd.merge(vendas_periodo, todas_dev_validas[['N.º de venda', col_valor]], on='N.º de venda', how='left', suffixes=('', '_dev'))
+    
+    # Identificar qual nome de coluna o merge gerou para o valor de devolução
+    col_valor_final = col_valor if col_valor in df_merged.columns else f"{col_valor}_dev"
+    
+    df_merged['tem_dev'] = df_merged[col_valor_final].notna()
+    df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     
     # Adicionar coluna 'Dev' para compatibilidade com a linha 661 do app.py
     df_merged['Dev'] = df_merged['tem_dev'].astype(int)
     
     # Agrupar por SKU/Produto
     if agrupar_por in df_merged.columns:
+        # Agrupar e calcular métricas básicas
         res = df_merged.groupby(agrupar_por).agg(
             Vendas=('N.º de venda', 'count'),
             Dev=('Dev', 'sum'),
             **{'Dev.': ('tem_dev', 'sum')}
         ).reset_index()
         
+        # Calcular Impacto e Reembolso separadamente para garantir precisão
+        impacto_por_sku = df_merged.groupby(agrupar_por)['valor_dev'].sum()
+        reemb_por_sku = df_merged.groupby(agrupar_por)[col_valor_final].sum().abs()
+        
+        # Mapear os valores de volta para o dataframe de resultado
+        res['Impacto'] = res[agrupar_por].map(impacto_por_sku)
+        res['Reemb.'] = res[agrupar_por].map(reemb_por_sku)
+        
         res['Taxa'] = (res['Dev.'] / res['Vendas'] * 100).round(1)
-        res['Impacto'] = df_merged.groupby(agrupar_por)['valor_dev'].sum().values
-        res['Reemb.'] = df_merged.groupby(agrupar_por)[col_valor].sum().abs().values
         res['Custo Dev.'] = 0.0  # Placeholder
         res['Risco'] = (res['Impacto'] / res['Vendas']).round(2)
         
         # Classificação ABC por impacto
         if len(res) > 0:
+            # Ordenar por impacto antes do cálculo ABC
+            res = res.sort_values('Impacto', ascending=False)
             impacto_total = res['Impacto'].sum()
             if impacto_total > 0:
                 res['Impacto_Acum'] = res['Impacto'].cumsum()
-                res['Impacto_Pct'] = (res['Impacto_Acum'] / impacto_total * 100).round(1)
+                res['Impacto_Pct'] = (res['Impacto_Acum'] / impacto_total * 100)
                 res['Classe'] = res['Impacto_Pct'].apply(lambda x: 'A' if x <= 80 else ('B' if x <= 95 else 'C'))
                 res = res.drop(['Impacto_Acum', 'Impacto_Pct'], axis=1)
             else:
                 res['Classe'] = 'C'
         
-        res = res.sort_values('Impacto', ascending=False)
-        
         if limit:
             res = res.head(limit)
         
-        # Total de devoluções únicas (baseado na soma da coluna Dev do agrupamento)
+        # Total de devoluções únicas
         total_dev = res['Dev'].sum()
         
         return garantir_colunas_app(res), total_dev
