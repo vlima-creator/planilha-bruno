@@ -88,6 +88,10 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if 'Forma de entrega_dev' in df_merged.columns:
         df_merged['Forma de entrega'] = df_merged['Forma de entrega'].fillna(df_merged['Forma de entrega_dev'])
     
+    # Garantir que col_valor existe após o merge
+    if col_valor not in df_merged.columns:
+        df_merged[col_valor] = 0.0
+    
     # Uma devolução só conta se a venda NÃO foi cancelada
     df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
         
@@ -172,6 +176,10 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     df_merged['is_cancelada'] = False
     if 'Estado' in df_merged.columns:
         df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
+    
+    # Garantir que col_valor existe após o merge
+    if col_valor not in df_merged.columns:
+        df_merged[col_valor] = 0.0
         
     df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
@@ -238,6 +246,19 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
         return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
 
     # Para devoluções: usar 'max' para evitar duplicatas por múltiplos itens no mesmo pedido
+    # Verificar se col_valor existe em todas_dev antes de agrupar
+    if col_valor not in todas_dev.columns:
+        # Se não houver devoluções, retornar vendas sem devoluções
+        if not vendas_periodo.empty and agrupar_por in vendas_periodo.columns:
+            res = vendas_periodo.groupby(agrupar_por).agg(
+                Vendas=('N.º de venda', 'count')
+            ).reset_index()
+            res = garantir_colunas_app(res)
+            res = res.sort_values('Vendas', ascending=False)
+            if limit: res = res.head(limit)
+            return res, 0
+        return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
+    
     dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'max'}).reset_index()
     
     if 'N.º de venda' not in vendas_periodo.columns:
@@ -248,6 +269,10 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     df_merged['is_cancelada'] = False
     if 'Estado' in df_merged.columns:
         df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
+    
+    # Garantir que col_valor existe após o merge
+    if col_valor not in df_merged.columns:
+        df_merged[col_valor] = 0.0
         
     df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
