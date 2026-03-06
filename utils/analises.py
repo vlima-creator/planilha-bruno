@@ -325,9 +325,9 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
         if limit:
             res = res.head(limit)
         
-        return garantir_colunas_app(res)
+        return garantir_colunas_app(res), None
     
-    return garantir_colunas_app(pd.DataFrame())
+    return garantir_colunas_app(pd.DataFrame()), None
 
 def simular_reducao(skus_data, percentual_reducao):
     """Simula redução de devoluções."""
