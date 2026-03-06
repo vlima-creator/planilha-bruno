@@ -22,6 +22,40 @@ def preparar_dados_analise(vendas, matriz, full):
             
     return vendas_periodo, todas_dev
 
+def _agrupar_vendas_por_pedido(vendas_periodo):
+    """
+    Para Shopee: agrupa linhas por pedido único para evitar duplicatas por múltiplos itens.
+    Para ML: retorna o DataFrame original.
+    """
+    plataforma = vendas_periodo['Plataforma'].iloc[0] if not vendas_periodo.empty and 'Plataforma' in vendas_periodo.columns else 'ML'
+    
+    if plataforma == 'Shopee' and 'N.º de venda' in vendas_periodo.columns:
+        # Agrupar por pedido: somar receita de produtos, usar primeiro valor para demais colunas
+        agg_dict = {}
+        if 'Receita por produtos (BRL)' in vendas_periodo.columns:
+            agg_dict['Receita por produtos (BRL)'] = 'sum'
+        if 'Receita por envio (BRL)' in vendas_periodo.columns:
+            agg_dict['Receita por envio (BRL)'] = 'first'
+        if 'Estado' in vendas_periodo.columns:
+            agg_dict['Estado'] = 'first'
+        if 'Forma de entrega' in vendas_periodo.columns:
+            agg_dict['Forma de entrega'] = 'first'
+        if 'Venda por publicidade' in vendas_periodo.columns:
+            agg_dict['Venda por publicidade'] = 'first'
+        if 'SKU' in vendas_periodo.columns:
+            agg_dict['SKU'] = 'first'
+        if 'Título do anúncio' in vendas_periodo.columns:
+            agg_dict['Título do anúncio'] = 'first'
+        if 'Plataforma' in vendas_periodo.columns:
+            agg_dict['Plataforma'] = 'first'
+        if 'Data da venda' in vendas_periodo.columns:
+            agg_dict['Data da venda'] = 'first'
+        
+        if agg_dict:
+            return vendas_periodo.groupby('N.º de venda').agg(agg_dict).reset_index()
+    
+    return vendas_periodo
+
 def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     """Análise de frete e forma de entrega."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
@@ -29,11 +63,14 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if vendas_periodo.empty:
         return pd.DataFrame()
 
-    # Agrupar devoluções por pedido, tentando capturar forma de entrega se existir
+    # Para Shopee: agrupar por pedido único antes da análise
+    vendas_periodo = _agrupar_vendas_por_pedido(vendas_periodo)
+
+    # Agrupar devoluções por pedido (sem duplicatas), capturando forma de entrega se existir
     col_valor = 'Cancelamentos e reembolsos (BRL)'
     if col_valor not in todas_dev.columns: todas_dev[col_valor] = 0.0
     
-    agg_dict = {col_valor: 'sum'}
+    agg_dict = {col_valor: 'max'}  # 'max' em vez de 'sum' para evitar duplicatas no relatório de devoluções
     if 'Forma de entrega' in todas_dev.columns:
         agg_dict['Forma de entrega'] = 'first'
     
@@ -42,8 +79,7 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     # Merge vendas com devoluções
     df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left', suffixes=('', '_dev'))
     
-    # Identificar Cancelamentos (Vendas que não foram concluídas)
-    # No ML e Shopee, o status 'Cancelado' ou similar indica que a venda não ocorreu
+    # Identificar Cancelamentos
     df_merged['is_cancelada'] = False
     if 'Estado' in df_merged.columns:
         df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
@@ -52,9 +88,7 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if 'Forma de entrega_dev' in df_merged.columns:
         df_merged['Forma de entrega'] = df_merged['Forma de entrega'].fillna(df_merged['Forma de entrega_dev'])
     
-    # Uma devolução só conta se a venda NÃO foi cancelada (se foi cancelada, é cancelamento, não devolução)
-    # IMPORTANTE: No ML, o registro de devolução pode vir com valor 0 se o produto foi devolvido mas não houve reembolso (ex: troca ou garantia)
-    # Portanto, validamos apenas se o registro existe no mapa de devoluções e a venda não foi cancelada.
+    # Uma devolução só conta se a venda NÃO foi cancelada
     df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
         
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
@@ -79,10 +113,10 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
         Impacto=('valor_dev', 'sum')
     ).reset_index()
     
-    # Vendas Líquidas (Vendas Totais - Cancelados) para cálculo de taxa de devolução mais preciso
+    # Vendas Líquidas (Vendas Totais - Cancelados)
     res['Vendas Líquidas'] = res['Vendas'] - res['Cancelados']
     res['Taxa (%)'] = (res['Devoluções'] / res['Vendas Líquidas'] * 100).fillna(0).round(1)
-    res['Impacto (R$)'] = (-res['Impacto']).round(2)
+    res['Impacto (R$)'] = res['Impacto'].round(2)
     res = res.rename(columns={col_forma: 'Forma de Entrega'})
     
     return res
@@ -95,6 +129,10 @@ def analisar_motivos(vendas=None, matriz=None, full=None, max_date=None, dias_at
     
     if todas_dev.empty:
         return pd.DataFrame()
+    
+    # Remover duplicatas por pedido para evitar contagem dupla
+    if 'N.º de venda' in todas_dev.columns:
+        todas_dev = todas_dev.drop_duplicates(subset=['N.º de venda'])
         
     col_motivo = 'Motivo do resultado' if 'Motivo do resultado' in todas_dev.columns else None
     if not col_motivo:
@@ -119,14 +157,18 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     
     if 'Venda por publicidade' not in vendas_periodo.columns:
         return pd.DataFrame()
+    
+    # Para Shopee: agrupar por pedido único
+    vendas_periodo = _agrupar_vendas_por_pedido(vendas_periodo)
         
     col_valor = 'Cancelamentos e reembolsos (BRL)'
     if col_valor not in todas_dev.columns: todas_dev[col_valor] = 0.0
     
-    dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'sum'}).reset_index()
+    # Usar 'max' para evitar duplicatas no relatório de devoluções
+    dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'max'}).reset_index()
     
     df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left')
-    # Identificar cancelamentos para consistência
+    # Identificar cancelamentos
     df_merged['is_cancelada'] = False
     if 'Estado' in df_merged.columns:
         df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
@@ -150,7 +192,7 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     
     res['Taxa (%)'] = (res['Devoluções'] / res['Vendas'] * 100).round(1)
     res['Receita (R$)'] = res['Receita'].round(2)
-    res['Impacto (R$)'] = (-res['Impacto']).round(2)
+    res['Impacto (R$)'] = res['Impacto'].round(2)
     
     return res
 
@@ -195,13 +237,14 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
             return res, 0
         return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
 
-    dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'sum'}).reset_index()
+    # Para devoluções: usar 'max' para evitar duplicatas por múltiplos itens no mesmo pedido
+    dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'max'}).reset_index()
     
     if 'N.º de venda' not in vendas_periodo.columns:
         return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
 
     df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left')
-    # Identificar cancelamentos para consistência
+    # Identificar cancelamentos
     df_merged['is_cancelada'] = False
     if 'Estado' in df_merged.columns:
         df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
@@ -223,7 +266,7 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     # Mapear para nomes esperados pelo app.py
     res['Dev.'] = res['Dev_count']
     res['Dev'] = res['Dev_count'] # Manter compatibilidade interna se houver
-    res['Impacto'] = (-res['Impacto_val']).round(2)
+    res['Impacto'] = res['Impacto_val'].round(2)
     res['Taxa'] = (res['Dev.'] / res['Vendas'] * 100).round(1)
     
     # Colunas adicionais para evitar erros no formatar_df_skus do app.py

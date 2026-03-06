@@ -9,9 +9,9 @@ def classificar_estado(estado, plataforma='ML'):
     estado_lower = str(estado).lower()
     
     if plataforma == 'Shopee':
-        # Shopee Status: 'Reembolso Concluído', 'Devolução Pendente', etc.
-        if 'reembolso concluído' in estado_lower or 'concluído' in estado_lower:
-            return 'Saudável' # Assumindo que o processo foi finalizado
+        # Shopee Status: 'Reembolso Concluído', 'Aprovada', 'Em devolução', etc.
+        if 'aprovad' in estado_lower or 'reembolso concluído' in estado_lower or 'concluído' in estado_lower:
+            return 'Saudável'
         if 'disputa' in estado_lower or 'rejeitado' in estado_lower:
             return 'Crítica'
         return 'Neutra'
@@ -35,6 +35,7 @@ def classificar_estado(estado, plataforma='ML'):
 def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     """
     Calcula métricas para um período específico.
+    Para Shopee: conta pedidos únicos (não linhas), evitando inflação por múltiplos itens.
     """
     if matriz is None:
         matriz = pd.DataFrame()
@@ -49,159 +50,206 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     dev_map = {}
     
     if len(todas_dev) > 0 and 'N.º de venda' in todas_dev.columns:
-        # Se for Shopee, podemos ter múltiplas entradas para o mesmo pedido no relatório de devoluções
-        # Vamos garantir que cada devolução única seja processada
         for _, row in todas_dev.iterrows():
             num_venda = str(row['N.º de venda'])
             if num_venda not in dev_map:
                 dev_map[num_venda] = []
             dev_map[num_venda].append(row)
     
-    # Calcular métricas
-    vendas_totais = len(vendas_periodo)
-    unidades_totais = 0
-    if 'Unidades' in vendas_periodo.columns:
-        unidades_totais = int(vendas_periodo['Unidades'].fillna(0).sum())
-    else:
-        unidades_totais = vendas_totais
-    
-    faturamento_produtos = 0.0
-    faturamento_total = 0.0
-    faturamento_devolucoes = 0.0
-    impacto_devolucao = 0.0
-    perda_total = 0.0
-    perda_parcial = 0.0
-    saudaveis = 0
-    criticas = 0
-    neutras = 0
-    
-    venda_com_devolucao = set()
-    vendas_canceladas_count = 0
-    
-    for _, venda in vendas_periodo.iterrows():
-        # Identificar se a venda foi cancelada
-        estado_venda = str(venda.get('Estado', '')).lower()
-        is_cancelada = 'cancelad' in estado_venda or 'anulad' in estado_venda
+    # Para Shopee: agrupar por pedido único para evitar duplicatas por múltiplos itens
+    if plataforma == 'Shopee' and 'N.º de venda' in vendas_periodo.columns:
+        # Identificar pedidos cancelados (por pedido único)
+        vendas_por_pedido = vendas_periodo.groupby('N.º de venda').agg(
+            Estado=('Estado', 'first'),
+            receita_prod=('Receita por produtos (BRL)', 'sum'),
+            receita_env=('Receita por envio (BRL)', 'first'),
+        ).reset_index()
         
-        if is_cancelada:
-            vendas_canceladas_count += 1
-            continue # Ignorar vendas canceladas para faturamento e devoluções
+        vendas_totais = len(vendas_por_pedido)
+        vendas_canceladas_count = vendas_por_pedido['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False).sum()
+        
+        faturamento_produtos = 0.0
+        faturamento_total = 0.0
+        faturamento_devolucoes = 0.0
+        impacto_devolucao = 0.0
+        perda_total = 0.0
+        perda_parcial = 0.0
+        saudaveis = 0
+        criticas = 0
+        neutras = 0
+        venda_com_devolucao = set()
+        
+        for _, venda in vendas_por_pedido.iterrows():
+            estado_venda = str(venda.get('Estado', '')).lower()
+            is_cancelada = 'cancelad' in estado_venda or 'anulad' in estado_venda
             
-        # Faturamento: somar receita de produtos + receita de envio
-        receita_prod = venda.get('Receita por produtos (BRL)', 0)
-        receita_env = venda.get('Receita por envio (BRL)', 0)
-        if pd.isna(receita_prod): receita_prod = 0.0
-        if pd.isna(receita_env): receita_env = 0.0
-        receita_prod = float(receita_prod)
-        receita_env = float(receita_env)
-        
-        faturamento_produtos += receita_prod
-        faturamento_total += receita_prod + receita_env
-        
-        # Verificar se esta venda tem devolução
-        num_venda = str(venda.get('N.º de venda', ''))
-        
-        if num_venda in dev_map:
-            # Para Shopee, verificar se a devolução é válida (não é apenas um registro de cancelamento)
-            tem_dev_valida = False
-            if plataforma == 'Shopee':
-                for dev in dev_map[num_venda]:
-                    # Se tem ID de devolução ou status de reembolso, é uma devolução real
+            if is_cancelada:
+                continue
+            
+            receita_prod = float(venda.get('receita_prod', 0) or 0)
+            receita_env = float(venda.get('receita_env', 0) or 0)
+            
+            faturamento_produtos += receita_prod
+            faturamento_total += receita_prod + receita_env
+            
+            num_venda = str(venda.get('N.º de venda', ''))
+            
+            if num_venda in dev_map:
+                # Para Shopee: usar apenas o primeiro registro de devolução por pedido
+                # (evitar duplicatas no relatório de devoluções)
+                devs_pedido = dev_map[num_venda]
+                
+                # Verificar se há devolução válida
+                tem_dev_valida = False
+                for dev in devs_pedido:
                     if pd.notna(dev.get('ID_Devolucao')) or dev.get('is_reembolso', False):
                         tem_dev_valida = True
                         break
-            else:
-                tem_dev_valida = True # Para ML, assumimos que se está no mapa, é devolução
-            
-            if tem_dev_valida:
-                venda_com_devolucao.add(num_venda)
-            elif plataforma != 'Shopee':
-                # Para ML, se o pedido está no mapa de devoluções e não foi cancelado,
-                # ele deve contar como devolução mesmo que o filtro de 'tem_dev_valida' falhe
-                # (ex: casos de troca onde não há ID de devolução explícito mas o registro existe)
-                venda_com_devolucao.add(num_venda)
-            
-            # Faturamento de Devoluções = receita dos produtos que foram devolvidos
-            # No ML, o valor de 'Cancelamentos e reembolsos (BRL)' já representa o valor estornado do produto
-            
-            for dev in dev_map[num_venda]:
-                # Impacto real: usar 'Cancelamentos e reembolsos (BRL)'
+                
+                # Se não há ID de devolução mas existe no mapa, ainda é uma devolução
+                if not tem_dev_valida and len(devs_pedido) > 0:
+                    tem_dev_valida = True
+                
+                if tem_dev_valida:
+                    venda_com_devolucao.add(num_venda)
+                
+                # Processar apenas o PRIMEIRO registro de devolução por pedido (evitar duplicatas)
+                dev = devs_pedido[0]
+                
                 reembolso = dev.get('Cancelamentos e reembolsos (BRL)', None)
                 if reembolso is None or pd.isna(reembolso):
                     reembolso = 0.0
                 reembolso = abs(float(reembolso))
                 
-                # Se reembolso é 0, usar receita do produto como fallback
                 if reembolso == 0:
                     reembolso = receita_prod
                 
-                # Adicionar ao faturamento de devoluções (valor bruto do produto devolvido)
                 faturamento_devolucoes += reembolso
                 
-                # Perda Parcial = Tarifas de envio + Tarifa de venda e impostos
-                # No ML, essas tarifas vêm negativas. Queremos o custo absoluto.
-                tarifas_envio = dev.get('Tarifas de envio (BRL)', 0)
-                if pd.isna(tarifas_envio): tarifas_envio = 0.0
-                tarifas_envio = float(tarifas_envio)
+                # Perda Parcial para Shopee:
+                # = Reembolso ao comprador - Renda do pedido (o que o vendedor recebeu) - Compensação da Shopee
+                # Representa o custo real que o vendedor arca (taxas, frete, etc.)
+                val_o = float(dev.get('Shopee_Col_O', 0.0) or 0.0)  # Renda do pedido
+                val_r = float(dev.get('Shopee_Col_R', 0.0) or 0.0)  # Valor de compensação
                 
-                tarifa_venda = dev.get('Tarifa de venda e impostos (BRL)', 0)
-                if pd.isna(tarifa_venda): tarifa_venda = 0.0
-                tarifa_venda = float(tarifa_venda)
+                # Perda Parcial = o que o vendedor perde em taxas/custos (não recupera)
+                perda_parcial_item = max(0.0, reembolso - val_o - val_r)
                 
-                # Perda parcial é a soma dos custos logísticos e taxas que não são recuperados
-                perda_parcial_item = abs(tarifas_envio) + abs(tarifa_venda)
-                
-                # Se for Shopee, usar colunas O e R para perdas se disponíveis
-                if plataforma == 'Shopee':
-                    val_o = dev.get('Shopee_Col_O', 0.0)
-                    val_r = dev.get('Shopee_Col_R', 0.0)
-                    
-                    if val_o > 0 or val_r > 0:
-                        perda_parcial_item = float(val_o)
-                        perda_total_item = float(val_r)
-                    else:
-                        classe = classificar_estado(dev.get('Estado'), plataforma)
-                        if classe == 'Saudável':
-                            perda_total_item = perda_parcial_item
-                        else:
-                            perda_total_item = reembolso + perda_parcial_item
+                classe = classificar_estado(dev.get('Estado'), plataforma)
+                if classe == 'Saudável':
+                    saudaveis += 1
+                    # Produto devolvido: perda é apenas as taxas não recuperadas
+                    perda_total_item = perda_parcial_item
+                elif classe == 'Crítica':
+                    criticas += 1
+                    # Produto perdido: perda total = reembolso + custos não recuperados
+                    perda_total_item = reembolso + perda_parcial_item
                 else:
-                    # Lógica ML original
-                    classe = classificar_estado(dev.get('Estado'), plataforma)
-                    if classe == 'Saudável':
-                        saudaveis += 1
-                        # Se saudável, o produto volta ao estoque, a perda é apenas a logística/taxas
-                        perda_total_item = perda_parcial_item
-                    elif classe == 'Crítica':
-                        criticas += 1
-                        # Se crítica, o produto é perdido, a perda é o valor do produto + logística/taxas
-                        perda_total_item = reembolso + perda_parcial_item
-                    else:
-                        neutras += 1
-                        perda_total_item = perda_parcial_item
-                
-                # Incrementar contadores de classe para Shopee se não foi feito acima
-                if plataforma == 'Shopee':
-                    classe = classificar_estado(dev.get('Estado'), plataforma)
-                    if classe == 'Saudável': saudaveis += 1
-                    elif classe == 'Crítica': criticas += 1
-                    else: neutras += 1
+                    neutras += 1
+                    perda_total_item = perda_parcial_item
                 
                 impacto_devolucao += reembolso
                 perda_total += perda_total_item
                 perda_parcial += perda_parcial_item
-    
-    # Contagem de devoluções = número de vendas que tiveram devolução
-    devolucoes_count = len(venda_com_devolucao)
-    
-    # Vendas Líquidas = Vendas Totais - Canceladas - Devoluções
-    # Devoluções aqui refere-se à quantidade de vendas que foram devolvidas
-    vendas_liquidas = vendas_totais - vendas_canceladas_count - devolucoes_count
-    
-    # Taxa de Devolução = Devoluções / (Vendas Totais - Canceladas)
-    # Isso representa o percentual de pedidos enviados que foram devolvidos
-    vendas_enviadas = vendas_totais - vendas_canceladas_count
-    taxa_devolucao = devolucoes_count / vendas_enviadas if vendas_enviadas > 0 else 0
+        
+        devolucoes_count = len(venda_com_devolucao)
+        vendas_liquidas = vendas_totais - vendas_canceladas_count - devolucoes_count
+        vendas_enviadas = vendas_totais - vendas_canceladas_count
+        taxa_devolucao = devolucoes_count / vendas_enviadas if vendas_enviadas > 0 else 0
+        
+        # Unidades totais (soma real de todas as linhas não canceladas)
+        vendas_nao_cancel = vendas_periodo[~vendas_periodo['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)]
+        unidades_totais = int(vendas_nao_cancel['Unidades'].fillna(0).sum()) if 'Unidades' in vendas_nao_cancel.columns else vendas_totais
+        
+    else:
+        # Lógica original para ML (linha a linha)
+        vendas_totais = len(vendas_periodo)
+        unidades_totais = 0
+        if 'Unidades' in vendas_periodo.columns:
+            unidades_totais = int(vendas_periodo['Unidades'].fillna(0).sum())
+        else:
+            unidades_totais = vendas_totais
+        
+        faturamento_produtos = 0.0
+        faturamento_total = 0.0
+        faturamento_devolucoes = 0.0
+        impacto_devolucao = 0.0
+        perda_total = 0.0
+        perda_parcial = 0.0
+        saudaveis = 0
+        criticas = 0
+        neutras = 0
+        
+        venda_com_devolucao = set()
+        vendas_canceladas_count = 0
+        
+        for _, venda in vendas_periodo.iterrows():
+            estado_venda = str(venda.get('Estado', '')).lower()
+            is_cancelada = 'cancelad' in estado_venda or 'anulad' in estado_venda
+            
+            if is_cancelada:
+                vendas_canceladas_count += 1
+                continue
+                
+            receita_prod = venda.get('Receita por produtos (BRL)', 0)
+            receita_env = venda.get('Receita por envio (BRL)', 0)
+            if pd.isna(receita_prod): receita_prod = 0.0
+            if pd.isna(receita_env): receita_env = 0.0
+            receita_prod = float(receita_prod)
+            receita_env = float(receita_env)
+            
+            faturamento_produtos += receita_prod
+            faturamento_total += receita_prod + receita_env
+            
+            num_venda = str(venda.get('N.º de venda', ''))
+            
+            if num_venda in dev_map:
+                tem_dev_valida = True
+                
+                if tem_dev_valida:
+                    venda_com_devolucao.add(num_venda)
+                
+                for dev in dev_map[num_venda]:
+                    reembolso = dev.get('Cancelamentos e reembolsos (BRL)', None)
+                    if reembolso is None or pd.isna(reembolso):
+                        reembolso = 0.0
+                    reembolso = abs(float(reembolso))
+                    
+                    if reembolso == 0:
+                        reembolso = receita_prod
+                    
+                    faturamento_devolucoes += reembolso
+                    
+                    tarifas_envio = dev.get('Tarifas de envio (BRL)', 0)
+                    if pd.isna(tarifas_envio): tarifas_envio = 0.0
+                    tarifas_envio = float(tarifas_envio)
+                    
+                    tarifa_venda = dev.get('Tarifa de venda e impostos (BRL)', 0)
+                    if pd.isna(tarifa_venda): tarifa_venda = 0.0
+                    tarifa_venda = float(tarifa_venda)
+                    
+                    perda_parcial_item = abs(tarifas_envio) + abs(tarifa_venda)
+                    
+                    # Lógica ML original
+                    classe = classificar_estado(dev.get('Estado'), plataforma)
+                    if classe == 'Saudável':
+                        saudaveis += 1
+                        perda_total_item = perda_parcial_item
+                    elif classe == 'Crítica':
+                        criticas += 1
+                        perda_total_item = reembolso + perda_parcial_item
+                    else:
+                        neutras += 1
+                        perda_total_item = perda_parcial_item
+                    
+                    impacto_devolucao += reembolso
+                    perda_total += perda_total_item
+                    perda_parcial += perda_parcial_item
+        
+        devolucoes_count = len(venda_com_devolucao)
+        vendas_liquidas = vendas_totais - vendas_canceladas_count - devolucoes_count
+        vendas_enviadas = vendas_totais - vendas_canceladas_count
+        taxa_devolucao = devolucoes_count / vendas_enviadas if vendas_enviadas > 0 else 0
     
     return {
         'vendas': vendas_totais,

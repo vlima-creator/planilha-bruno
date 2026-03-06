@@ -98,7 +98,7 @@ def ler_vendas(file):
             df['Unidades'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(1)
             
             # Valores financeiros Shopee
-            df['Receita por produtos (BRL)'] = df['Preço acordado'].apply(limpar_valor_shopee) * df['Unidades']
+            df['Receita por produtos (BRL)'] = df['Subtotal do produto'].apply(limpar_valor_shopee)
             df['Receita por envio (BRL)'] = df['Taxa de envio pagas pelo comprador'].apply(limpar_valor_shopee)
             
             # Venda por publicidade na Shopee? (Não tem essa info direta no Order.all)
@@ -162,10 +162,9 @@ def ler_devolucoes(file):
             df['Motivo do resultado'] = df['Motivo da Devolução']
             
             # Identificar se é um reembolso concluído ou em processo
-            df['is_reembolso'] = df['Estado'].astype(str).str.lower().str.contains('reembolso|concluído|aceito', na=False)
+            df['is_reembolso'] = df['Estado'].astype(str).str.lower().str.contains('reembolso|concluído|aceito|aprovad', na=False)
             
             # Tentar capturar forma de entrega se disponível no relatório de devoluções
-            # Na Shopee, às vezes o relatório de devolução tem o canal de envio
             if 'Método de envio' in df.columns and 'Opção de envio' in df.columns:
                 df['Forma de entrega'] = df.apply(
                     lambda x: f"{x['Método de envio']} ({x['Opção de envio']})" 
@@ -177,25 +176,19 @@ def ler_devolucoes(file):
                 df['Forma de entrega'] = df['Método de envio']
             
             # Valores financeiros Shopee
-            # Coluna O (15ª coluna, índice 14): Reembolso ao comprador (Impacto)
-            # Coluna R (18ª coluna, índice 17): Compensação da Shopee ou similar?
-            # O usuário mencionou O e R. Vamos tentar mapear pelo nome se possível, ou pelo índice.
-            
-            # Mapeamento por índice para garantir captura das colunas O e R
-            cols_originais = df.columns.tolist()
-            col_o = cols_originais[14] if len(cols_originais) > 14 else None
-            col_r = cols_originais[17] if len(cols_originais) > 17 else None
-            
+            # 'Quantia total de reembolsos' = valor reembolsado ao comprador (impacto bruto)
             df['Cancelamentos e reembolsos (BRL)'] = df['Quantia total de reembolsos'].apply(limpar_valor_shopee)
             
-            # Se colunas O e R existirem, vamos usá-las para perda parcial e total
-            if col_o:
-                df['Shopee_Col_O'] = df[col_o].apply(limpar_valor_shopee)
+            # CORREÇÃO: Mapear por nome de coluna, não por índice
+            # 'Renda do pedido' = valor que o vendedor recebeu do pedido original
+            # 'Valor de compensação' = compensação paga pela Shopee ao vendedor
+            if 'Renda do pedido' in df.columns:
+                df['Shopee_Col_O'] = df['Renda do pedido'].apply(limpar_valor_shopee)
             else:
                 df['Shopee_Col_O'] = 0.0
                 
-            if col_r:
-                df['Shopee_Col_R'] = df[col_r].apply(limpar_valor_shopee)
+            if 'Valor de compensação' in df.columns:
+                df['Shopee_Col_R'] = df['Valor de compensação'].apply(limpar_valor_shopee)
             else:
                 df['Shopee_Col_R'] = 0.0
                 
