@@ -29,16 +29,22 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if vendas_periodo.empty:
         return pd.DataFrame()
 
-    # Agrupar devoluções por pedido
+    # Agrupar devoluções por pedido, tentando capturar forma de entrega se existir
     col_valor = 'Cancelamentos e reembolsos (BRL)'
     if col_valor not in todas_dev.columns: todas_dev[col_valor] = 0.0
     
-    dev_agg = todas_dev.groupby('N.º de venda').agg({
-        col_valor: 'sum'
-    }).reset_index()
+    agg_dict = {col_valor: 'sum'}
+    if 'Forma de entrega' in todas_dev.columns:
+        agg_dict['Forma de entrega'] = 'first'
+    
+    dev_agg = todas_dev.groupby('N.º de venda').agg(agg_dict).reset_index()
     
     # Merge vendas com devoluções
-    df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left')
+    df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left', suffixes=('', '_dev'))
+    
+    # Se a forma de entrega não estiver na venda mas estiver na devolução, preencher
+    if 'Forma de entrega_dev' in df_merged.columns:
+        df_merged['Forma de entrega'] = df_merged['Forma de entrega'].fillna(df_merged['Forma de entrega_dev'])
     df_merged['tem_dev'] = df_merged[col_valor].notna()
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
     

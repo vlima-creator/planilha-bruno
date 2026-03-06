@@ -145,6 +145,11 @@ def ler_devolucoes(file):
             df['Estado'] = df['Status da Devolução / Reembolso']
             df['Motivo do resultado'] = df['Motivo da Devolução']
             
+            # Tentar capturar forma de entrega se disponível no relatório de devoluções
+            # Na Shopee, às vezes o relatório de devolução tem o canal de envio
+            if 'Método de envio' in df.columns:
+                df['Forma de entrega'] = df['Método de envio']
+            
             # Valores financeiros Shopee
             df['Cancelamentos e reembolsos (BRL)'] = df['Quantia total de reembolsos'].apply(limpar_valor_shopee)
             df['Tarifas de envio (BRL)'] = 0.0 # Shopee não detalha isso aqui
