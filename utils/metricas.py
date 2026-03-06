@@ -189,9 +189,14 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     # Contagem de devoluções = número de vendas que tiveram devolução
     devolucoes_count = len(venda_com_devolucao)
     
-    # Vendas Líquidas = Vendas Totais - Canceladas
-    vendas_liquidas = vendas_totais - vendas_canceladas_count
-    taxa_devolucao = devolucoes_count / vendas_liquidas if vendas_liquidas > 0 else 0
+    # Vendas Líquidas = Vendas Totais - Canceladas - Devoluções
+    # Devoluções aqui refere-se à quantidade de vendas que foram devolvidas
+    vendas_liquidas = vendas_totais - vendas_canceladas_count - devolucoes_count
+    
+    # Taxa de Devolução = Devoluções / (Vendas Totais - Canceladas)
+    # Isso representa o percentual de pedidos enviados que foram devolvidos
+    vendas_enviadas = vendas_totais - vendas_canceladas_count
+    taxa_devolucao = devolucoes_count / vendas_enviadas if vendas_enviadas > 0 else 0
     
     return {
         'vendas': vendas_totais,
