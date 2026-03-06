@@ -428,8 +428,8 @@ else:
     fc1, fc2, fc3, fc4 = st.columns([1.2, 1.2, 1, 1])
     
     with fc1:
-        janela_opcoes = {'30 dias': 30, '60 dias': 60, '90 dias': 90, '120 dias': 120, '150 dias': 150, '180 dias': 180}
-        janela_label = st.selectbox("Janela", list(janela_opcoes.keys()), index=5, key="filtro_janela")
+        janela_opcoes = {'7 dias': 7, '15 dias': 15, '30 dias': 30, '60 dias': 60, '90 dias': 90, '120 dias': 120, '150 dias': 150, '180 dias': 180}
+        janela_label = st.selectbox("Janela", list(janela_opcoes.keys()), index=2, key="filtro_janela")
         janela_global = janela_opcoes[janela_label]
     
     with fc2:
