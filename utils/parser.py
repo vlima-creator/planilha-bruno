@@ -210,9 +210,14 @@ def ler_devolucoes(file):
                 if 'Data da venda' in df.columns:
                     df['Data da venda'] = df['Data da venda'].apply(parse_date_pt_br)
                 
+                # Converter valores numéricos para float, especialmente 'Cancelamentos e reembolsos (BRL)'
                 for col in df.columns:
                     if isinstance(col, str) and ('BRL' in col or 'Receita' in col or 'Custo' in col or 'Taxa' in col):
                         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                
+                # Garantir que 'Cancelamentos e reembolsos (BRL)' é positivo (converter de negativo se necessário)
+                if 'Cancelamentos e reembolsos (BRL)' in df.columns:
+                    df['Cancelamentos e reembolsos (BRL)'] = df['Cancelamentos e reembolsos (BRL)'].abs()
                 
                 df['Plataforma'] = 'ML'
                 if 'matriz' in sheet_lower:
