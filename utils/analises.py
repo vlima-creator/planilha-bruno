@@ -51,14 +51,29 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     """Análise de frete e custos logísticos."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
+    col_frete = 'Custo de frete a cargo do vendedor (BRL)'
+    col_valor_dev = 'Cancelamentos e reembolsos (BRL)'
+    
+    # Garantir que a coluna de frete existe
+    if col_frete not in vendas_periodo.columns:
+        vendas_periodo[col_frete] = 0.0
+    
     # Calcular custos de frete
-    frete_total = vendas_periodo['Custo de frete a cargo do vendedor (BRL)'].sum()
+    frete_total = vendas_periodo[col_frete].sum()
     
     # Cruzar com devoluções para ver frete perdido
-    df_merged = pd.merge(vendas_periodo, todas_dev[['N.º de venda', 'Cancelamentos e reembolsos (BRL)']], on='N.º de venda', how='left')
-    df_merged['tem_dev'] = df_merged['Cancelamentos e reembolsos (BRL)'].notna()
+    # Garantir que col_valor_dev existe em todas_dev
+    if col_valor_dev not in todas_dev.columns:
+        todas_dev[col_valor_dev] = 0.0
+        
+    df_merged = pd.merge(vendas_periodo, todas_dev[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     
-    frete_perdido = df_merged[df_merged['tem_dev']]['Custo de frete a cargo do vendedor (BRL)'].sum()
+    # Identificar qual nome de coluna o merge gerou para o valor de devolução
+    col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
+    
+    df_merged['tem_dev'] = df_merged[col_valor_final].notna()
+    
+    frete_perdido = df_merged[df_merged['tem_dev']][col_frete].sum()
     
     return {
         'frete_total': frete_total,
