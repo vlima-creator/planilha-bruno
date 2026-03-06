@@ -3,23 +3,15 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
-import os
-from dotenv import load_dotenv
-
-# Carregar variáveis de ambiente
-load_dotenv()
 from utils.parser import processar_arquivos
 from utils.metricas import calcular_metricas, calcular_qualidade_arquivo
 from utils.export import exportar_xlsx
 from utils.analises import analisar_frete, analisar_motivos, analisar_ads, analisar_skus, simular_reducao
 from utils.formatacao import formatar_brl, formatar_percentual, formatar_pct_direto, formatar_numero, formatar_risco
-from utils.analise_anuncios import processar_analise_completa
-from tab_analise_anuncios import render_tab_analise_anuncios
-from tab_guia_uso import render_tab_guia_uso
 
 # Configuração da página
 st.set_page_config(
-    page_title="Gestão de Devolução Inteligente",
+    page_title="Dashboard Vendas x Devoluções",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -28,210 +20,67 @@ st.set_page_config(
 # CSS customizado
 st.markdown("""
     <style>
-    /* Configurações Globais */
-    .main {
-        background-color: #000000;
-    }
-    
-    [data-testid="stAppViewContainer"] {
-        background-color: #000000;
-    }
-
-    /* Estilo dos Cartões de Métricas (Glass Effect) */
+    /* Estilo dos Cartões de Métricas */
     .metric-card {
-        background-color: rgba(255, 255, 255, 0.03);
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(10px);
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #e6e9ef;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         flex: 1;
         position: relative;
-        min-height: 110px;
-        transition: all 0.3s ease;
-    }
-    .metric-card:hover {
-        border-color: rgba(82, 121, 111, 0.5);
-        background-color: rgba(82, 121, 111, 0.15);
-        transform: translateY(-3px);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+        min-height: 100px;
     }
     .metric-label {
-        color: #888888;
-        font-size: 0.85rem;
+        color: #6e7787;
+        font-size: 0.8rem;
         font-weight: 600;
         text-transform: uppercase;
-        margin-bottom: 8px;
-        letter-spacing: 0.5px;
+        margin-bottom: 5px;
     }
     .metric-value {
-        color: #ffffff;
-        font-size: 1.7rem;
+        color: #1a1d23;
+        font-size: 1.5rem;
         font-weight: 700;
     }
     .metric-subvalue {
-        color: #888888;
-        font-size: 0.8rem;
-        margin-top: 4px;
+        color: #9ba3af;
+        font-size: 0.75rem;
+        margin-top: 2px;
     }
     .metric-icon {
         position: absolute;
-        right: 20px;
+        right: 15px;
         top: 50%;
         transform: translateY(-50%);
-        font-size: 2rem;
-        color: #a0a0a0;
-        opacity: 0.5;
+        font-size: 1.8rem;
+        color: #d1d5db;
     }
     
-    /* Estilo das Seções de Gráficos (Glass Effect) */
+    /* Estilo das Seções de Gráficos */
     .chart-container {
-        background-color: rgba(255, 255, 255, 0.03);
-        padding: 25px;
-        border-radius: 15px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(10px);
-        margin-bottom: 25px;
-        transition: all 0.3s ease;
-    }
-    .chart-container:hover {
-        border-color: rgba(82, 121, 111, 0.5);
-        box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.9);
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #e6e9ef;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
     }
     .chart-title {
-        color: #ffffff;
+        color: #1a1d23;
         font-size: 1rem;
         font-weight: 700;
         margin-bottom: 20px;
     }
     
-    /* Estilo do Cabecalho de Filtros */
+    /* Estilo do Cabeçalho de Filtros */
     .filter-header {
-        background-color: rgba(255, 255, 255, 0.02);
-        padding: 20px 30px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        margin-bottom: 25px;
-    }
-    
-    /* Estilo do Simulador */
-    .simulator-box {
-        background-color: rgba(255, 255, 255, 0.03);
-        padding: 20px;
+        background-color: white;
+        padding: 15px 25px;
         border-radius: 10px;
-        border: 1px solid #334155;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e6e9ef;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         margin-bottom: 20px;
-        transition: all 0.3s ease;
-    }
-    .simulator-box:hover {
-        border-color: #3b82f6;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
-    }
-    
-    .simulator-bar-container {
-        display: flex;
-        gap: 0;
-        height: 24px;
-        border-radius: 4px;
-        overflow: hidden;
-        margin-bottom: 20px;
-    }
-    
-    .simulator-bar-yellow {
-        background-color: #ffd700;
-        height: 100%;
-        border-radius: 4px 0 0 4px;
-        transition: width 0.1s ease;
-    }
-    
-    .simulator-bar-dark {
-        background-color: #4a4a4a;
-        height: 100%;
-        flex: 1;
-        border-radius: 0 4px 4px 0;
-    }
-    
-    /* Ajustes para Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #000000;
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    [data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3 {
-        color: #f8fafc;
-    }
-    
-    /* Estilo para os botões */
-    .stButton > button {
-        border-radius: 10px;
-        font-weight: 600;
-        background-color: rgba(82, 121, 111, 0.2) !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(82, 121, 111, 0.5) !important;
-        transition: all 0.3s ease !important;
-    }
-    .stButton > button:hover {
-        background-color: rgba(82, 121, 111, 0.4) !important;
-        border-color: rgba(82, 121, 111, 0.8) !important;
-        transform: scale(1.02);
-    }
-    
-    /* Estilo para o uploader na sidebar */
-    [data-testid="stSidebar"] .stFileUploader {
-        padding: 15px;
-        background-color: rgba(255, 255, 255, 0.02);
-        border-radius: 12px;
-        border: 1px dashed rgba(255, 255, 255, 0.1);
-        margin-bottom: 20px;
-    }
-
-    /* Estilização das Abas (Tabs) - Liquid Glass Style */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
-        background-color: transparent;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        width: 100%;
-        padding: 10px 0;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: nowrap;
-        background-color: rgba(255, 255, 255, 0.02);
-        border-radius: 10px;
-        color: #888888;
-        font-weight: 600;
-        padding: 10px 25px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        transition: all 0.3s ease;
-        flex: 1;
-        min-width: 150px;
-        text-align: center;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: rgba(82, 121, 111, 0.3) !important;
-        color: #ffffff !important;
-        border-color: rgba(82, 121, 111, 0.6) !important;
-        box-shadow: 0 4px 15px rgba(82, 121, 111, 0.2);
-    }
-
-    .stTabs [data-baseweb="tab"]:hover {
-        color: #ffffff;
-        background-color: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.1);
-    }
-
-    /* Inputs e Selects */
-    .stTextInput > div > div > input, .stSelectbox > div > div > div {
-        background-color: rgba(255, 255, 255, 0.02) !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 10px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -249,7 +98,7 @@ def render_metric_card(label, value, subvalue, icon):
 # ─────────────────────────────────────────────────────────
 # Função de filtragem global dos dados
 # ─────────────────────────────────────────────────────────
-def aplicar_filtros(data, janela, canal, somente_ads, top10_skus, agrupar_por='SKU'):
+def aplicar_filtros(data, janela, canal, somente_ads, top10_skus):
     """
     Aplica os filtros globais do cabeçalho sobre os dados brutos.
     Retorna um dicionário com os mesmos campos de 'data', mas filtrados.
@@ -280,19 +129,16 @@ def aplicar_filtros(data, janela, canal, somente_ads, top10_skus, agrupar_por='S
         if 'Venda por publicidade' in vendas.columns:
             vendas = vendas[vendas['Venda por publicidade'] == 'Sim']
 
-    # 4) Filtro TOP 10 (filtra vendas apenas dos 10 itens com mais devoluções)
+    # 4) Filtro TOP 10 SKUs (filtra vendas apenas dos 10 SKUs com mais devoluções)
     if top10_skus:
         todas_dev = pd.concat([matriz, full], ignore_index=True)
-        col_id = agrupar_por if agrupar_por in vendas.columns else 'SKU'
-        
-        if len(todas_dev) > 0 and 'N.º de venda' in todas_dev.columns and col_id in vendas.columns:
-            # Mapear devoluções para itens via vendas
+        if len(todas_dev) > 0 and 'N.º de venda' in todas_dev.columns and 'SKU' in vendas.columns:
+            # Mapear devoluções para SKUs via vendas
             dev_nums = set(todas_dev['N.º de venda'].astype(str).unique())
             vendas_com_dev = vendas[vendas['N.º de venda'].astype(str).isin(dev_nums)]
-            
-            if col_id in vendas_com_dev.columns:
-                top_items = vendas_com_dev[col_id].value_counts().head(10).index.tolist()
-                vendas = vendas[vendas[col_id].isin(top_items)]
+            if 'SKU' in vendas_com_dev.columns:
+                top_skus = vendas_com_dev['SKU'].value_counts().head(10).index.tolist()
+                vendas = vendas[vendas['SKU'].isin(top_skus)]
                 # Filtrar devoluções para manter apenas as relacionadas às vendas filtradas
                 vendas_nums = set(vendas['N.º de venda'].astype(str).unique())
                 if len(matriz) > 0 and 'N.º de venda' in matriz.columns:
@@ -316,105 +162,74 @@ def aplicar_filtros(data, janela, canal, somente_ads, top10_skus, agrupar_por='S
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
 
-# ─────────────────────────────────────────────────────────
-# SIDEBAR - UPLOAD E CONFIGURAÇÕES
-# ─────────────────────────────────────────────────────────
-with st.sidebar:
-    st.title("🚀 Gestão de Devolução Inteligente")
-    st.markdown("---")
-    
-    st.subheader("📁 Upload de Dados")
-    file_vendas = st.file_uploader("Relatório de Vendas", type=['xlsx'], key='vendas', help="Arraste o arquivo .xlsx de vendas do ML")
-    file_devolucoes = st.file_uploader("Relatório de Devoluções", type=['xlsx'], key='devolucoes', help="Arraste o arquivo .xlsx de devoluções do ML")
-    
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        btn_processar = st.button("🚀 Processar", use_container_width=True, type="primary")
-    with col_btn2:
-        btn_exemplo = st.button("📋 Exemplo", use_container_width=True)
-        
-    if btn_processar:
-        if file_vendas and file_devolucoes:
-            with st.spinner("Processando..."):
-                try:
-                    data = processar_arquivos(file_vendas, file_devolucoes)
-                    st.session_state.processed_data = data
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {str(e)}")
-        else:
-            st.warning("Selecione os dois arquivos")
-            
-    if btn_exemplo:
-        with st.spinner("Carregando..."):
-            try:
-                import os
-                example_dir = "public/examples"
-                if os.path.exists(f"{example_dir}/vendas_exemplo.xlsx") and os.path.exists(f"{example_dir}/devolucoes_exemplo.xlsx"):
-                    with open(f"{example_dir}/vendas_exemplo.xlsx", 'rb') as f1:
-                        with open(f"{example_dir}/devolucoes_exemplo.xlsx", 'rb') as f2:
-                            data = processar_arquivos(f1, f2)
-                            st.session_state.processed_data = data
-                            st.rerun()
-                else:
-                    st.warning("Exemplos não encontrados")
-            except Exception as e:
-                st.error(f"Erro: {str(e)}")
-
-    if st.session_state.processed_data is not None:
-        st.markdown("---")
-        st.subheader("⚙️ Configurações")
-        visualizacao = st.radio(
-            "Visualizar por:",
-            ["SKU", "Nome do Produto"],
-            index=0,
-            key="config_visualizacao",
-            help="Altera como os produtos são agrupados nas tabelas e gráficos"
-        )
-        
-        st.markdown("---")
-        if st.button("🗑️ Limpar Dados", use_container_width=True):
-            st.session_state.processed_data = None
-            st.rerun()
+# Sidebar
+st.sidebar.title("📊 Menu")
+st.sidebar.markdown("---")
 
 # ─────────────────────────────────────────────────────────
-# CONTEÚDO PRINCIPAL
+# PÁGINA DE UPLOAD
 # ─────────────────────────────────────────────────────────
 if st.session_state.processed_data is None:
-    # Definir valores padrão para evitar erros de escopo
-    visualizacao = "SKU"
-    agrupar_por = "SKU"
-    
     st.title("📊 Dashboard Vendas x Devoluções")
-    st.markdown("""
-    ### Bem-vindo! 
-    Para começar a análise, utilize a **barra lateral à esquerda** para carregar seus relatórios do Mercado Livre.
+    st.markdown("Análise automática de Vendas e Devoluções do Mercado Livre (BR)")
     
-    **Arquivos necessários:**
-    1.  **Relatório de Vendas** (.xlsx)
-    2.  **Relatório de Devoluções** (.xlsx)
-    
-    *Dica: Você também pode clicar em 'Exemplo' na barra lateral para visualizar como o dashboard funciona.*
-    """)
-    
-    # Ilustração ou cards informativos
     st.markdown("---")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.info("**Análise de Canais**\n\nCompare o desempenho entre Matriz e Full.")
-    with c2:
-        st.info("**Motivos de Devolução**\n\nIdentifique os principais gargalos da sua operação.")
-    with c3:
-        st.info("**Impacto Financeiro**\n\nVisualize o quanto as devoluções afetam seu lucro.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("📁 Relatório de Vendas")
+        file_vendas = st.file_uploader("Selecione o arquivo de Vendas", type=['xlsx'], key='vendas')
+    with col2:
+        st.subheader("📁 Relatório de Devoluções")
+        file_devolucoes = st.file_uploader("Selecione o arquivo de Devoluções", type=['xlsx'], key='devolucoes')
+    
+    st.markdown("---")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🚀 Processar", use_container_width=True, type="primary"):
+            if file_vendas and file_devolucoes:
+                with st.spinner("Processando arquivos..."):
+                    try:
+                        data = processar_arquivos(file_vendas, file_devolucoes)
+                        st.session_state.processed_data = data
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar: {str(e)}")
+            else:
+                st.warning("Por favor, selecione ambos os arquivos")
+    
+    with col2:
+        if st.button("📋 Carregar Exemplo", use_container_width=True):
+            with st.spinner("Carregando exemplo..."):
+                try:
+                    import os
+                    example_dir = "public/examples"
+                    if os.path.exists(f"{example_dir}/vendas_exemplo.xlsx") and os.path.exists(f"{example_dir}/devolucoes_exemplo.xlsx"):
+                        with open(f"{example_dir}/vendas_exemplo.xlsx", 'rb') as f1:
+                            with open(f"{example_dir}/devolucoes_exemplo.xlsx", 'rb') as f2:
+                                data = processar_arquivos(f1, f2)
+                                st.session_state.processed_data = data
+                                st.rerun()
+                    else:
+                        st.warning("Arquivos de exemplo não encontrados")
+                except Exception as e:
+                    st.error(f"Erro ao carregar exemplo: {str(e)}")
 
+# ─────────────────────────────────────────────────────────
+# DASHBOARD
+# ─────────────────────────────────────────────────────────
 else:
     data_raw = st.session_state.processed_data
     
-    # Recuperar configuração da sidebar ou usar padrão
-    visualizacao = st.session_state.get('config_visualizacao', 'SKU')
-    agrupar_por = 'SKU' if visualizacao == "SKU" else 'Título do anúncio'
-    
-    st.title("📊 Dashboard de Análise")
+    # Header
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("📊 Dashboard de Análise")
+    with col2:
+        if st.button("← Voltar", use_container_width=True):
+            st.session_state.processed_data = None
+            st.rerun()
     
     # ─────────────────────────────────────────────────────
     # CABEÇALHO GLOBAL DE FILTROS
@@ -435,12 +250,12 @@ else:
         somente_ads_global = st.toggle("Somente Ads", value=False, key="filtro_ads")
     
     with fc4:
-        top10_skus_global = st.toggle(f"Top 10 {visualizacao}s", value=False, key="filtro_top10")
+        top10_skus_global = st.toggle("Top 10 SKUs", value=False, key="filtro_top10")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Aplicar filtros globais
-    data = aplicar_filtros(data_raw, janela_global, canal_global, somente_ads_global, top10_skus_global, agrupar_por=agrupar_por)
+    data = aplicar_filtros(data_raw, janela_global, canal_global, somente_ads_global, top10_skus_global)
     
     # Garantir DataFrames válidos para funções
     df_matriz = data['matriz'] if data['matriz'] is not None else pd.DataFrame()
@@ -451,14 +266,10 @@ else:
     # ─────────────────────────────────────────────────────
     # ABAS
     # ─────────────────────────────────────────────────────
-    tab_guia, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-        "📖 Guia de Uso", "Resumo", "Janelas", "Matriz/Full", "Frete", 
-        "Motivos", "Ads", "Anúncios", "Simulador", "IA Análise"
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+        "📈 Resumo", "🎯 Janelas", "📦 Matriz/Full", "🚚 Frete", 
+        "🔍 Motivos", "📢 Ads", "📊 SKUs", "🎮 Simulador"
     ])
-    
-    # ─── TAB GUIA: GUIA DE USO ───
-    with tab_guia:
-        render_tab_guia_uso()
     
     # ─── TAB 1: RESUMO ───
     with tab1:
@@ -501,30 +312,24 @@ else:
             
         with col_right:
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.markdown(f'<div class="chart-title">Top 5 {visualizacao}s por Devoluções</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title">Top 5 SKUs por Devoluções</div>', unsafe_allow_html=True)
             
-            df_skus_top, _ = analisar_skus(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global, 5, agrupar_por=agrupar_por)
+            df_skus_top, _ = analisar_skus(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global, 5)
             
             if not df_skus_top.empty:
-                # Garantir que a coluna de agrupamento existe no DataFrame retornado
-                col_y = agrupar_por if agrupar_por in df_skus_top.columns else df_skus_top.columns[0]
-                
                 df_skus_top = df_skus_top.sort_values('Dev.', ascending=True)
                 fig_bar = go.Figure(go.Bar(
-                    x=df_skus_top['Dev.'], y=df_skus_top[col_y],
+                    x=df_skus_top['Dev.'], y=df_skus_top['SKU'],
                     orientation='h', marker_color='#f59e0b'
                 ))
                 fig_bar.update_layout(
-                    template='plotly_dark',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
                     margin=dict(t=0, b=0, l=0, r=0), height=300,
-                    xaxis=dict(showgrid=True, gridcolor='#334155'),
+                    xaxis=dict(showgrid=True, gridcolor='#f3f4f6'),
                     yaxis=dict(showgrid=False)
                 )
                 st.plotly_chart(fig_bar, use_container_width=True)
             else:
-                st.info(f"Sem dados de {visualizacao}s para exibir")
+                st.info("Sem dados de SKUs para exibir")
             st.markdown('</div>', unsafe_allow_html=True)
 
     # ─── TAB 2: JANELAS ───
@@ -539,7 +344,7 @@ else:
         
         for janela in janelas_list:
             # Usar data_raw para recalcular por janela, mas aplicar canal/ads/top10
-            d_temp = aplicar_filtros(data_raw, janela, canal_global, somente_ads_global, top10_skus_global, agrupar_por=agrupar_por)
+            d_temp = aplicar_filtros(data_raw, janela, canal_global, somente_ads_global, top10_skus_global)
             m = calcular_metricas(d_temp['vendas'], d_temp['matriz'], d_temp['full'], d_temp['max_date'], janela)
             janelas_data_raw.append({
                 'Período': f'{janela}d',
@@ -574,12 +379,9 @@ else:
             line=dict(color='#ef4444', width=2), marker=dict(size=6), yaxis='y2'
         ))
         fig.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
             title='',
-            xaxis=dict(title='Período', showgrid=True, gridcolor='#334155'),
-            yaxis=dict(title='Vendas / Devoluções', showgrid=True, gridcolor='#334155', side='left'),
+            xaxis=dict(title='Período', showgrid=True, gridcolor='#e5e7eb'),
+            yaxis=dict(title='Vendas / Devoluções', showgrid=True, gridcolor='#e5e7eb', side='left'),
             yaxis2=dict(title='Taxa (%)', overlaying='y', side='right'),
             hovermode='x unified', height=400, margin=dict(r=80),
             legend=dict(x=0.01, y=0.99)
@@ -603,7 +405,9 @@ else:
                 'Perda Total': formatar_brl(row['Perda_Total']),
                 'Perda Parcial': formatar_brl(row['Perda_Parcial']),
                 'Saud.': row['Saudaveis'],
+                'Imp. Saud.': formatar_brl(0),
                 'Crit.': row['Criticas'],
+                'Imp. Crit.': formatar_brl(0),
             })
         
         df_tabela = pd.DataFrame(tabela_data)
@@ -619,75 +423,75 @@ else:
         
         with col_matriz:
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #f8fafc;">Matriz</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #1a1d23;">Matriz</div>', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_matriz['devolucoes_vendas'])}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_matriz['devolucoes_vendas'])}</div>
                     </div>
                 """, unsafe_allow_html=True)
             with c2:
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_matriz['taxa_devolucao'])}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_matriz['taxa_devolucao'])}</div>
                     </div>
                 """, unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_matriz['impacto_devolucao'])}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_matriz['impacto_devolucao'])}</div>
                     </div>
                 """, unsafe_allow_html=True)
             with c2:
                 # Calcular Top 10 concentração para Matriz
-                df_skus_m, total_dev_m = analisar_skus(data['vendas'], data['matriz'], None, data['max_date'], janela_global, agrupar_por=agrupar_por)
+                df_skus_m, total_dev_m = analisar_skus(data['vendas'], data['matriz'], None, data['max_date'], janela_global)
                 top10_m = (df_skus_m.sort_values('Dev.', ascending=False).head(10)['Dev.'].sum() / total_dev_m * 100) if total_dev_m > 0 and len(df_skus_m) > 0 else 0
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_pct_direto(top10_m)}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_pct_direto(top10_m)}</div>
                     </div>
                 """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col_full:
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #f8fafc;">Full</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #1a1d23;">Full</div>', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_full['devolucoes_vendas'])}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_full['devolucoes_vendas'])}</div>
                     </div>
                 """, unsafe_allow_html=True)
             with c2:
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_full['taxa_devolucao'])}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_full['taxa_devolucao'])}</div>
                     </div>
                 """, unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_full['impacto_devolucao'])}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_full['impacto_devolucao'])}</div>
                     </div>
                 """, unsafe_allow_html=True)
             with c2:
-                df_skus_f, total_dev_f = analisar_skus(data['vendas'], None, data['full'], data['max_date'], janela_global, agrupar_por=agrupar_por)
+                df_skus_f, total_dev_f = analisar_skus(data['vendas'], None, data['full'], data['max_date'], janela_global)
                 top10_f = (df_skus_f.sort_values('Dev.', ascending=False).head(10)['Dev.'].sum() / total_dev_f * 100) if total_dev_f > 0 and len(df_skus_f) > 0 else 0
                 st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_pct_direto(top10_f)}</div>
+                    <div style="padding: 15px; background-color: #f9fafb; border-radius: 8px; text-align: center;">
+                        <div style="color: #9ba3af; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
+                        <div style="color: #1a1d23; font-size: 1.8rem; font-weight: 700;">{formatar_pct_direto(top10_f)}</div>
                     </div>
                 """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -705,9 +509,6 @@ else:
         fig.add_trace(go.Bar(x=['Matriz', 'Full'], y=[total_matriz, total_full], name='Devoluções', marker_color='#3b82f6', yaxis='y1'))
         fig.add_trace(go.Bar(x=['Matriz', 'Full'], y=[impacto_matriz, impacto_full], name='Impacto (R$)', marker_color='#ef4444', yaxis='y2'))
         fig.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
             barmode='group', title='',
             xaxis=dict(title='Canal'),
             yaxis=dict(title='Devoluções', side='left'),
@@ -747,11 +548,8 @@ else:
                 text=df_motivos_sorted['Quantidade'], textposition='outside'
             ))
             fig.update_layout(
-                template='plotly_dark',
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
                 title='',
-                xaxis=dict(title='Quantidade', showgrid=True, gridcolor='#334155'),
+                xaxis=dict(title='Quantidade', showgrid=True, gridcolor='#e5e7eb'),
                 yaxis=dict(title=''), height=400, margin=dict(l=250, r=50)
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -820,17 +618,17 @@ else:
             st.markdown(f"""
                 <div style="padding: 10px 0;">
                     <div style="color: #3b82f6; font-size: 1rem; font-weight: 700; margin-bottom: 15px;">Publicidade</div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #475569;">
-                        <span style="color: #f8fafc; font-weight: 500;">Vendas</span>
-                        <span style="color: #f8fafc; font-weight: 600;">{formatar_numero(ads_vendas)}</span>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
+                        <span style="color: #1a1d23; font-weight: 500;">Vendas</span>
+                        <span style="color: #1a1d23; font-weight: 600;">{formatar_numero(ads_vendas)}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #475569;">
-                        <span style="color: #f8fafc; font-weight: 500;">Devoluções</span>
-                        <span style="color: #f8fafc; font-weight: 600;">{formatar_numero(ads_dev)}</span>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
+                        <span style="color: #1a1d23; font-weight: 500;">Devoluções</span>
+                        <span style="color: #1a1d23; font-weight: 600;">{formatar_numero(ads_dev)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-                        <span style="color: #f8fafc; font-weight: 500;">Taxa</span>
-                        <span style="color: #f8fafc; font-weight: 600;">{formatar_pct_direto(ads_taxa)}</span>
+                        <span style="color: #1a1d23; font-weight: 500;">Taxa</span>
+                        <span style="color: #1a1d23; font-weight: 600;">{formatar_pct_direto(ads_taxa)}</span>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
@@ -838,25 +636,25 @@ else:
             st.markdown(f"""
                 <div style="padding: 10px 0;">
                     <div style="color: #3b82f6; font-size: 1rem; font-weight: 700; margin-bottom: 15px;">Orgânico</div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #475569;">
-                        <span style="color: #f8fafc; font-weight: 500;">Vendas</span>
-                        <span style="color: #f8fafc; font-weight: 600;">{formatar_numero(org_vendas)}</span>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
+                        <span style="color: #1a1d23; font-weight: 500;">Vendas</span>
+                        <span style="color: #1a1d23; font-weight: 600;">{formatar_numero(org_vendas)}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #475569;">
-                        <span style="color: #f8fafc; font-weight: 500;">Devoluções</span>
-                        <span style="color: #f8fafc; font-weight: 600;">{formatar_numero(org_dev)}</span>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
+                        <span style="color: #1a1d23; font-weight: 500;">Devoluções</span>
+                        <span style="color: #1a1d23; font-weight: 600;">{formatar_numero(org_dev)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-                        <span style="color: #f8fafc; font-weight: 500;">Taxa</span>
-                        <span style="color: #f8fafc; font-weight: 600;">{formatar_pct_direto(org_taxa)}</span>
+                        <span style="color: #1a1d23; font-weight: 500;">Taxa</span>
+                        <span style="color: #1a1d23; font-weight: 600;">{formatar_pct_direto(org_taxa)}</span>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ─── TAB 7: ANÚNCIOS ───
+    # ─── TAB 7: SKUS ───
     with tab7:
-        df_skus_all, total_dev_skus = analisar_skus(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global, agrupar_por=agrupar_por)
+        df_skus_all, total_dev_skus = analisar_skus(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global)
         
         total_skus_com_dev = len(df_skus_all)
         if total_dev_skus > 0 and len(df_skus_all) > 0:
@@ -884,7 +682,7 @@ else:
         with c3:
             st.markdown(f"""
                 <div class="metric-card" style="text-align: center;">
-                    <div class="metric-label">{visualizacao}s com devolução</div>
+                    <div class="metric-label">SKUs com devolução</div>
                     <div class="metric-value" style="font-size: 2rem;">{total_skus_com_dev}</div>
                 </div>
             """, unsafe_allow_html=True)
@@ -903,11 +701,7 @@ else:
                 df_display['Reemb.'] = df_display['Reemb.'].apply(lambda x: formatar_brl(x))
                 df_display['Custo Dev.'] = df_display['Custo Dev.'].apply(lambda x: formatar_brl(x))
                 df_display['Risco'] = df_display['Risco'].apply(lambda x: formatar_risco(x))
-                
-                # Garantir que a coluna de agrupamento existe
-                col_id = agrupar_por if agrupar_por in df_display.columns else df_display.columns[0]
-                
-                return df_display[[col_id, 'Vendas', 'Dev.', 'Taxa', 'Impacto', 'Reemb.', 'Custo Dev.', 'Risco', 'Classe']]
+                return df_display[['SKU', 'Vendas', 'Dev.', 'Taxa', 'Impacto', 'Reemb.', 'Custo Dev.', 'Risco', 'Classe']]
             
             with sub_tab1:
                 df_vol = df_skus_all.sort_values('Dev.', ascending=False).head(20)
@@ -917,7 +711,7 @@ else:
                 if len(df_taxa) > 0:
                     st.dataframe(formatar_df_skus(df_taxa), use_container_width=True, hide_index=True)
                 else:
-                    st.info(f"Nenhum {visualizacao} com taxa ≥ 20% e pelo menos 5 vendas")
+                    st.info("Nenhum SKU com taxa ≥ 20% e pelo menos 5 vendas")
             with sub_tab3:
                 df_perda = df_skus_all.sort_values('Impacto', ascending=True).head(20)
                 st.dataframe(formatar_df_skus(df_perda), use_container_width=True, hide_index=True)
@@ -937,31 +731,37 @@ else:
         impacto_total = abs(metricas_sim['impacto_devolucao'])
         perda_media = (impacto_total / total_dev) if total_dev > 0 else 0
         
-        st.markdown('<div class="simulator-box">', unsafe_allow_html=True)
-        st.markdown('<h4 style="margin-top: 0; margin-bottom: 15px;">Simulador de Reducao de Devolucoes</h4>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">Simulador de Impacto</div>', unsafe_allow_html=True)
         
         max_slider = int(taxa_atual) if taxa_atual > 0 else 10
-        reducao_pct = st.slider("Reducao desejada (%)", 0, max_slider, min(1, max_slider), key="sim_reducao_pct")
+        reducao_pp = st.slider("Redução desejada (pp)", 0, max_slider, min(1, max_slider), key="sim_reducao_pp")
+        
+        st.markdown(f"""
+            <div style="color: #6e7787; font-size: 0.85rem; margin-top: -10px; margin-bottom: 10px;">
+                Redução desejada: <strong style="color: #1a1d23;">{reducao_pp}pp</strong>
+            </div>
+            <div style="color: #6e7787; font-size: 0.85rem;">
+                Perda média por devolução: <strong style="color: #1a1d23;">{formatar_brl(perda_media)}</strong>
+            </div>
+        """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
-        nova_taxa = max(taxa_atual - reducao_pct, 0)
+        nova_taxa = max(taxa_atual - reducao_pp, 0)
+        diff_pp = taxa_atual - nova_taxa
         vendas_totais = metricas_sim['vendas']
-        dev_evitadas = int((reducao_pct / 100) * vendas_totais) if vendas_totais > 0 else 0
+        dev_evitadas = int((diff_pp / 100) * vendas_totais) if vendas_totais > 0 else 0
         dinheiro_recuperado = dev_evitadas * perda_media
         
         st.markdown("<br>", unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
         with c1:
-            render_metric_card("DEVOLUCOES SIMULADAS", formatar_numero(dev_evitadas), f"Antes: {formatar_numero(int(total_dev))}", "📦")
+            render_metric_card("TAXA ATUAL", formatar_pct_direto(taxa_atual), "", "🎯")
         with c2:
-            render_metric_card("PERDA SIMULADA", formatar_brl(dinheiro_recuperado), f"Antes: {formatar_brl(impacto_total)}", "💰")
+            render_metric_card("NOVA TAXA", formatar_pct_direto(nova_taxa), f"-{reducao_pp}pp", "📈")
         with c3:
-            render_metric_card("ECONOMIA ESTIMADA", formatar_brl(dinheiro_recuperado), "Reducao de perda", "📈")
-    
-    # ─── TAB 9: IA ANÁLISE DE ANÚNCIOS ───
-    with tab9:
-        render_tab_analise_anuncios()
+            render_metric_card("DINHEIRO RECUPERADO", formatar_brl(dinheiro_recuperado), f"{formatar_numero(dev_evitadas)} devoluções evitadas", "📋")
     
     # ─── EXPORT ───
     st.markdown("---")
@@ -977,24 +777,3 @@ else:
             )
         except Exception as e:
             st.error(f"Erro ao exportar: {str(e)}")
-
-# ─── RODAPÉ ───
-st.markdown("""
-    <style>
-    .footer {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background-color: transparent;
-        color: white;
-        text-align: center;
-        padding: 10px;
-        font-size: 0.8rem;
-        z-index: 999;
-    }
-    </style>
-    <div class="footer">
-        © Desenvolvido por Vinicius Lima / CNPJ: 47.192.694/0001-70
-    </div>
-""", unsafe_allow_html=True)
