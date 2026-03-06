@@ -140,24 +140,40 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     col_valor = 'Cancelamentos e reembolsos (BRL)'
     if col_valor not in todas_dev.columns: todas_dev[col_valor] = 0.0
     
+    # Função para garantir todas as colunas que o app.py espera
+    def garantir_colunas_app(df):
+        cols_esperadas = {
+            'Vendas': 0,
+            'Dev.': 0,
+            'Taxa': 0.0,
+            'Impacto': 0.0,
+            'Reemb.': 0.0,
+            'Custo Dev.': 0.0,
+            'Risco': 0.0,
+            'Classe': 'C',
+            'Dev': 0 # Fallback para uso interno se necessário
+        }
+        for col, val in cols_esperadas.items():
+            if col not in df.columns:
+                df[col] = val
+        return df
+
     # Se todas_dev estiver vazio ou não tiver ID de venda, retornamos algo vazio mas estruturado
     if 'N.º de venda' not in todas_dev.columns or todas_dev.empty:
         if not vendas_periodo.empty and agrupar_por in vendas_periodo.columns:
             res = vendas_periodo.groupby(agrupar_por).agg(
                 Vendas=('N.º de venda', 'count')
             ).reset_index()
-            res['Dev'] = 0
-            res['Impacto'] = 0.0
-            res['Taxa'] = 0.0
+            res = garantir_colunas_app(res)
             res = res.sort_values('Vendas', ascending=False)
             if limit: res = res.head(limit)
             return res, 0
-        return pd.DataFrame(columns=[agrupar_por, 'Vendas', 'Dev', 'Impacto', 'Taxa']), 0
+        return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
 
     dev_agg = todas_dev.groupby('N.º de venda').agg({col_valor: 'sum'}).reset_index()
     
     if 'N.º de venda' not in vendas_periodo.columns:
-        return pd.DataFrame(columns=[agrupar_por, 'Vendas', 'Dev', 'Impacto', 'Taxa']), 0
+        return garantir_colunas_app(pd.DataFrame(columns=[agrupar_por])), 0
 
     df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left')
     df_merged['tem_dev'] = df_merged[col_valor].notna()
@@ -170,18 +186,27 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     
     res = df_merged.groupby(agrupar_por).agg(
         Vendas=('N.º de venda', 'count'),
-        Dev=('tem_dev', 'sum'),
-        Impacto=('valor_dev', 'sum')
+        Dev_count=('tem_dev', 'sum'),
+        Impacto_val=('valor_dev', 'sum')
     ).reset_index()
     
-    res['Taxa'] = (res['Dev'] / res['Vendas'] * 100).round(1)
-    res['Impacto'] = (-res['Impacto']).round(2)
+    # Mapear para nomes esperados pelo app.py
+    res['Dev.'] = res['Dev_count']
+    res['Dev'] = res['Dev_count'] # Manter compatibilidade interna se houver
+    res['Impacto'] = (-res['Impacto_val']).round(2)
+    res['Taxa'] = (res['Dev.'] / res['Vendas'] * 100).round(1)
     
-    res = res.sort_values('Dev', ascending=False)
+    # Colunas adicionais para evitar erros no formatar_df_skus do app.py
+    res = garantir_colunas_app(res)
+    
+    # Lógica de Risco simples para não vir zerado
+    res['Risco'] = (res['Taxa'] * res['Vendas'] / 100).round(1)
+    
+    res = res.sort_values('Dev.', ascending=False)
     if limit:
         res = res.head(limit)
         
-    return res, res['Dev'].sum()
+    return res, res['Dev.'].sum()
 
 def simular_reducao(vendas, matriz, full, max_date, dias_atras, reducao_pct):
     """Simula redução de devoluções."""
