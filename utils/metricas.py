@@ -94,20 +94,24 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
             venda_com_devolucao.add(num_venda)
             
             # Faturamento de Devoluções = receita dos produtos que foram devolvidos
-            faturamento_devolucoes += receita_prod
+            # No ML, o valor de 'Cancelamentos e reembolsos (BRL)' já representa o valor estornado do produto
             
             for dev in dev_map[num_venda]:
                 # Impacto real: usar 'Cancelamentos e reembolsos (BRL)'
                 reembolso = dev.get('Cancelamentos e reembolsos (BRL)', None)
                 if reembolso is None or pd.isna(reembolso):
                     reembolso = 0.0
-                reembolso = float(reembolso)
+                reembolso = abs(float(reembolso))
                 
                 # Se reembolso é 0, usar receita do produto como fallback
                 if reembolso == 0:
                     reembolso = receita_prod
                 
+                # Adicionar ao faturamento de devoluções (valor bruto do produto devolvido)
+                faturamento_devolucoes += reembolso
+                
                 # Perda Parcial = Tarifas de envio + Tarifa de venda e impostos
+                # No ML, essas tarifas vêm negativas. Queremos o custo absoluto.
                 tarifas_envio = dev.get('Tarifas de envio (BRL)', 0)
                 if pd.isna(tarifas_envio): tarifas_envio = 0.0
                 tarifas_envio = float(tarifas_envio)
@@ -116,37 +120,34 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                 if pd.isna(tarifa_venda): tarifa_venda = 0.0
                 tarifa_venda = float(tarifa_venda)
                 
-                # Perda parcial é a soma dos custos (já vêm negativos no ML)
+                # Perda parcial é a soma dos custos logísticos e taxas que não são recuperados
                 perda_parcial_item = abs(tarifas_envio) + abs(tarifa_venda)
                 
                 # Se for Shopee, usar colunas O e R para perdas se disponíveis
                 if plataforma == 'Shopee':
-                    # O usuário sugeriu O e R para perdas. 
-                    # Vamos assumir que R seja a perda total e O a perda parcial (ou vice-versa)
-                    # Com base no pedido, vamos mapear:
                     val_o = dev.get('Shopee_Col_O', 0.0)
                     val_r = dev.get('Shopee_Col_R', 0.0)
                     
                     if val_o > 0 or val_r > 0:
-                        # Se tivermos esses valores, eles sobressaem a lógica padrão
                         perda_parcial_item = float(val_o)
                         perda_total_item = float(val_r)
                     else:
-                        # Fallback se colunas estiverem vazias
                         classe = classificar_estado(dev.get('Estado'), plataforma)
                         if classe == 'Saudável':
                             perda_total_item = perda_parcial_item
                         else:
-                            perda_total_item = abs(reembolso) + perda_parcial_item
+                            perda_total_item = reembolso + perda_parcial_item
                 else:
                     # Lógica ML original
                     classe = classificar_estado(dev.get('Estado'), plataforma)
                     if classe == 'Saudável':
                         saudaveis += 1
+                        # Se saudável, o produto volta ao estoque, a perda é apenas a logística/taxas
                         perda_total_item = perda_parcial_item
                     elif classe == 'Crítica':
                         criticas += 1
-                        perda_total_item = abs(reembolso) + perda_parcial_item
+                        # Se crítica, o produto é perdido, a perda é o valor do produto + logística/taxas
+                        perda_total_item = reembolso + perda_parcial_item
                     else:
                         neutras += 1
                         perda_total_item = perda_parcial_item
@@ -158,7 +159,7 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                     elif classe == 'Crítica': criticas += 1
                     else: neutras += 1
                 
-                impacto_devolucao += abs(reembolso)
+                impacto_devolucao += reembolso
                 perda_total += perda_total_item
                 perda_parcial += perda_parcial_item
     
@@ -174,9 +175,9 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
         'devolucoes_vendas': devolucoes_count,
         'taxa_devolucao': taxa_devolucao,
         'faturamento_devolucoes': faturamento_devolucoes,
-        'impacto_devolucao': -abs(impacto_devolucao),
-        'perda_total': -abs(perda_total),
-        'perda_parcial': -abs(perda_parcial),
+        'impacto_devolucao': impacto_devolucao,
+        'perda_total': perda_total,
+        'perda_parcial': perda_parcial,
         'saudaveis': saudaveis,
         'criticas': criticas,
         'neutras': neutras,
