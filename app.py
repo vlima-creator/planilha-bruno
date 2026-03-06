@@ -470,9 +470,9 @@ else:
         
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         with c1:
-            render_metric_card("VENDAS", formatar_numero(metricas['vendas']), f"{formatar_numero(metricas['unidades'])} un.", "🛒")
+            render_metric_card("VENDAS LÍQUIDAS", formatar_numero(metricas['vendas_liquidas']), f"Bruto: {formatar_numero(metricas['vendas'])}", "🛒")
         with c2:
-            render_metric_card("FATURAMENTO", formatar_brl(metricas['faturamento_produtos']), f"Total: {formatar_brl(metricas['faturamento_total'])}", "💲")
+            render_metric_card("CANCELADOS", formatar_numero(metricas['vendas_canceladas']), "Vendas não concluídas", "🚫")
         with c3:
             render_metric_card("DEVOLUÇÕES", formatar_numero(metricas['devolucoes_vendas']), f"Taxa: {formatar_percentual(metricas['taxa_devolucao'])}", "🔄")
         with c4:

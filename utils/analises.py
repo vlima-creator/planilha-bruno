@@ -42,10 +42,18 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     # Merge vendas com devoluções
     df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left', suffixes=('', '_dev'))
     
+    # Identificar Cancelamentos (Vendas que não foram concluídas)
+    # No ML e Shopee, o status 'Cancelado' ou similar indica que a venda não ocorreu
+    df_merged['is_cancelada'] = False
+    if 'Estado' in df_merged.columns:
+        df_merged['is_cancelada'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelad|anulad', na=False)
+    
     # Se a forma de entrega não estiver na venda mas estiver na devolução, preencher
     if 'Forma de entrega_dev' in df_merged.columns:
         df_merged['Forma de entrega'] = df_merged['Forma de entrega'].fillna(df_merged['Forma de entrega_dev'])
-    df_merged['tem_dev'] = df_merged[col_valor].notna()
+    
+    # Uma devolução só conta se a venda NÃO foi cancelada (se foi cancelada, é cancelamento, não devolução)
+    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
     
     # Se valor_dev é 0 mas tem devolução, usar receita do produto
@@ -63,11 +71,14 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     
     res = df_merged.groupby(col_forma).agg(
         Vendas=('N.º de venda', 'count'),
+        Cancelados=('is_cancelada', 'sum'),
         Devoluções=('tem_dev', 'sum'),
         Impacto=('valor_dev', 'sum')
     ).reset_index()
     
-    res['Taxa (%)'] = (res['Devoluções'] / res['Vendas'] * 100).round(1)
+    # Vendas Líquidas (Vendas Totais - Cancelados) para cálculo de taxa de devolução mais preciso
+    res['Vendas Líquidas'] = res['Vendas'] - res['Cancelados']
+    res['Taxa (%)'] = (res['Devoluções'] / res['Vendas Líquidas'] * 100).fillna(0).round(1)
     res['Impacto (R$)'] = (-res['Impacto']).round(2)
     res = res.rename(columns={col_forma: 'Forma de Entrega'})
     

@@ -104,6 +104,10 @@ def ler_vendas(file):
             # Venda por publicidade na Shopee? (Não tem essa info direta no Order.all)
             df['Venda por publicidade'] = 'Não'
             
+            # Status do Pedido Shopee
+            if 'Status do pedido' in df.columns:
+                df['Estado'] = df['Status do pedido']
+            
             # Canal na Shopee (Padrão)
             # Formato solicitado: (Método de envio + Opção de envio)
             if 'Método de envio' in df.columns and 'Opção de envio' in df.columns:

@@ -74,8 +74,17 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     neutras = 0
     
     venda_com_devolucao = set()
+    vendas_canceladas_count = 0
     
     for _, venda in vendas_periodo.iterrows():
+        # Identificar se a venda foi cancelada
+        estado_venda = str(venda.get('Estado', '')).lower()
+        is_cancelada = 'cancelad' in estado_venda or 'anulad' in estado_venda
+        
+        if is_cancelada:
+            vendas_canceladas_count += 1
+            continue # Ignorar vendas canceladas para faturamento e devoluções
+            
         # Faturamento: somar receita de produtos + receita de envio
         receita_prod = venda.get('Receita por produtos (BRL)', 0)
         receita_env = venda.get('Receita por envio (BRL)', 0)
@@ -165,10 +174,15 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     
     # Contagem de devoluções = número de vendas que tiveram devolução
     devolucoes_count = len(venda_com_devolucao)
-    taxa_devolucao = devolucoes_count / vendas_totais if vendas_totais > 0 else 0
+    
+    # Vendas Líquidas = Vendas Totais - Canceladas
+    vendas_liquidas = vendas_totais - vendas_canceladas_count
+    taxa_devolucao = devolucoes_count / vendas_liquidas if vendas_liquidas > 0 else 0
     
     return {
         'vendas': vendas_totais,
+        'vendas_canceladas': vendas_canceladas_count,
+        'vendas_liquidas': vendas_liquidas,
         'unidades': unidades_totais,
         'faturamento_produtos': faturamento_produtos,
         'faturamento_total': faturamento_total,
