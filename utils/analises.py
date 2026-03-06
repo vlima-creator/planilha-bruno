@@ -48,42 +48,63 @@ def _agrupar_vendas_por_pedido(vendas_periodo):
     return vendas_periodo
 
 def analisar_frete(vendas, matriz, full, max_date, dias_atras):
-    """Análise de frete e custos logísticos."""
+    """Análise de frete e forma de entrega."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
     col_frete = 'Custo de frete a cargo do vendedor (BRL)'
     col_valor_dev = 'Cancelamentos e reembolsos (BRL)'
+    col_entrega = 'Forma de entrega'
     
-    # Garantir que a coluna de frete existe
+    # Garantir colunas básicas
     if col_frete not in vendas_periodo.columns:
         vendas_periodo[col_frete] = 0.0
-    
-    # Calcular custos de frete
-    frete_total = vendas_periodo[col_frete].sum()
-    
-    # Cruzar com devoluções para ver frete perdido
-    # Garantir que col_valor_dev existe em todas_dev
+    if col_entrega not in vendas_periodo.columns:
+        vendas_periodo[col_entrega] = 'Não informado'
     if col_valor_dev not in todas_dev.columns:
         todas_dev[col_valor_dev] = 0.0
         
+    # Cruzar vendas com devoluções
     df_merged = pd.merge(vendas_periodo, todas_dev[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     
-    # Identificar qual nome de coluna o merge gerou para o valor de devolução
+    # Identificar coluna de valor após merge
     col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
     
     df_merged['tem_dev'] = df_merged[col_valor_final].notna()
+    df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     
-    frete_perdido = df_merged[df_merged['tem_dev']][col_frete].sum()
+    # Identificar cancelados (valor_dev > 0 mas sem ser devolução marcada - simplificação se necessário)
+    # No contexto atual, vamos considerar devoluções como cancelados para preencher a tabela se não houver distinção clara
+    df_merged['is_cancelado'] = False # Placeholder se não houver lógica de cancelamento clara
     
-    return {
-        'frete_total': frete_total,
-        'frete_perdido': frete_perdido,
-        'impacto_frete': (frete_perdido / frete_total * 100) if frete_total > 0 else 0
-    }
+    # Agrupar por Forma de Entrega
+    res = df_merged.groupby(col_entrega).agg(
+        Vendas=('N.º de venda', 'count'),
+        Devoluções=('tem_dev', 'sum'),
+        Cancelados=('is_cancelado', 'sum'),
+        Impacto=('valor_dev', 'sum')
+    ).reset_index()
+    
+    # Renomear coluna de agrupamento para 'Forma de Entrega'
+    res = res.rename(columns={col_entrega: 'Forma de Entrega'})
+    
+    # Cálculos adicionais
+    res['Vendas Líquidas'] = res['Vendas'] - res['Devoluções'] - res['Cancelados']
+    res['Taxa (%)'] = (res['Devoluções'] / res['Vendas'] * 100).round(1).fillna(0)
+    
+    # Renomear para o que o app.py espera na exibição
+    res = res.rename(columns={'Impacto': 'Impacto (R$)'})
+    
+    # Garantir ordem das colunas para o display
+    cols_ordem = ['Forma de Entrega', 'Vendas', 'Cancelados', 'Devoluções', 'Vendas Líquidas', 'Taxa (%)', 'Impacto (R$)']
+    for col in cols_ordem:
+        if col not in res.columns:
+            res[col] = 0
+            
+    return res[cols_ordem]
 
-def analisar_motivos(matriz, full):
+def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
     """Análise qualitativa de motivos de devolução."""
-    todas_dev = pd.concat([matriz, full], ignore_index=True)
+    vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
     if 'Motivo' not in todas_dev.columns:
         return pd.DataFrame()
@@ -144,7 +165,7 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     todas_dev_validas = todas_dev[todas_dev[col_valor] != 0].copy()
     
     # Merge vendas com devoluções
-    # Usamos suffixes para evitar conflitos se col_valor já existir em vendas_periodo
+    # Usamos suffixes para evitar conflitos se col_valor already exist in vendas_periodo
     df_merged = pd.merge(vendas_periodo, todas_dev_validas[['N.º de venda', col_valor]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     
     # Identificar qual nome de coluna o merge gerou para o valor de devolução
