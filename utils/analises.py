@@ -81,7 +81,9 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     dev_agg = todas_dev.groupby('N.º de venda').agg(agg_dict).reset_index()
     
     # Merge vendas com devoluções
-    df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='left', suffixes=('', '_dev'))
+    # CORREÇÃO: Usar right join para garantir que TODAS as devoluções reais sejam incluídas,
+    # mesmo que o pedido não esteja no arquivo de vendas (pode ocorrer por janelas de tempo diferentes)
+    df_merged = pd.merge(vendas_periodo, dev_agg, on='N.º de venda', how='outer', suffixes=('', '_dev'))
     
     # Identificar Cancelamentos
     df_merged['is_cancelada'] = False
@@ -96,12 +98,13 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if col_valor not in df_merged.columns:
         df_merged[col_valor] = 0.0
     
-    # Uma devolução só conta se a venda NÃO foi cancelada
-    df_merged['tem_dev'] = (df_merged[col_valor].notna()) & (~df_merged['is_cancelada'])
+    # Uma devolução só conta se a venda NÃO foi cancelada E se o valor de reembolso é > 0
+    # (O filtro já foi aplicado em todas_dev, então se col_valor > 0, é uma devolução real)
+    df_merged['tem_dev'] = (df_merged[col_valor] > 0) & (~df_merged['is_cancelada'])
         
     df_merged['valor_dev'] = df_merged[col_valor].fillna(0)
     
-    # Se valor_dev é 0 mas tem devolução, usar receita do produto
+    # Se valor_dev é 0 mas tem devolução (pode ocorrer se o filtro falhar ou em casos específicos), usar receita do produto
     col_receita = 'Receita por produtos (BRL)'
     if col_receita not in df_merged.columns: df_merged[col_receita] = 0.0
     
@@ -112,22 +115,23 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if not col_forma:
         return pd.DataFrame()
         
+    # CORREÇÃO: Se a forma de entrega for nula tanto na venda quanto na devolução, 
+    # mas o pedido for uma devolução real, vamos tentar identificar o canal (Matriz/Full)
+    # para não perder a informação na tabela.
+    df_merged[col_forma] = df_merged[col_forma].fillna(df_merged['Forma de entrega_dev'])
     df_merged[col_forma] = df_merged[col_forma].fillna('Outros').replace(['', ' '], 'Outros')
     
+    # Agrupar métricas principais
     res = df_merged.groupby(col_forma).agg(
         Vendas=('N.º de venda', 'nunique'),
         Cancelados=('is_cancelada', 'sum'),
-        Impacto=('valor_dev', 'sum')
+        Impacto=('valor_dev', 'sum'),
+        Devoluções=('tem_dev', 'sum')
     ).reset_index()
     
-    # Contar devoluções por forma de entrega (apenas pedidos únicos com devolução)
-    dev_por_forma = {}
-    for forma in df_merged[col_forma].unique():
-        df_forma = df_merged[df_merged[col_forma] == forma]
-        pedidos_com_dev = df_forma[df_forma['tem_dev']]['N.º de venda'].nunique()
-        dev_por_forma[forma] = pedidos_com_dev
-    
-    res['Devoluções'] = res[col_forma].map(dev_por_forma).fillna(0).astype(int)
+    # CORREÇÃO: Se o Vendas for menor que Devoluções (pode ocorrer devido ao outer join),
+    # ajustar Vendas para ser no mínimo Devoluções + Cancelados para manter a lógica da tabela
+    res['Vendas'] = res[['Vendas', 'Devoluções', 'Cancelados']].apply(lambda x: max(x['Vendas'], x['Devoluções'] + x['Cancelados']), axis=1)
     
     # Vendas Líquidas (Vendas Totais - Cancelados - Devoluções)
     res['Vendas Líquidas'] = res['Vendas'] - res['Cancelados'] - res['Devoluções']
