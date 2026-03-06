@@ -111,17 +111,31 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     df_merged[col_forma] = df_merged[col_forma].fillna('Outros').replace(['', ' '], 'Outros')
     
     res = df_merged.groupby(col_forma).agg(
-        Vendas=('N.º de venda', 'count'),
+        Vendas=('N.º de venda', 'nunique'),
         Cancelados=('is_cancelada', 'sum'),
-        Devoluções=('tem_dev', 'sum'),
         Impacto=('valor_dev', 'sum')
     ).reset_index()
     
-    # Vendas Líquidas (Vendas Totais - Cancelados)
-    res['Vendas Líquidas'] = res['Vendas'] - res['Cancelados']
-    res['Taxa (%)'] = (res['Devoluções'] / res['Vendas Líquidas'] * 100).fillna(0).round(1)
+    # Contar devoluções por forma de entrega (apenas pedidos únicos com devolução)
+    dev_por_forma = {}
+    for forma in df_merged[col_forma].unique():
+        df_forma = df_merged[df_merged[col_forma] == forma]
+        pedidos_com_dev = df_forma[df_forma['tem_dev']]['N.º de venda'].nunique()
+        dev_por_forma[forma] = pedidos_com_dev
+    
+    res['Devoluções'] = res[col_forma].map(dev_por_forma).fillna(0).astype(int)
+    
+    # Vendas Líquidas (Vendas Totais - Cancelados - Devoluções)
+    res['Vendas Líquidas'] = res['Vendas'] - res['Cancelados'] - res['Devoluções']
+    
+    # Taxa de devolução: (Devoluções / (Vendas - Cancelados)) * 100
+    res['Vendas Enviadas'] = res['Vendas'] - res['Cancelados']
+    res['Taxa (%)'] = (res['Devoluções'] / res['Vendas Enviadas'] * 100).fillna(0).round(1)
     res['Impacto (R$)'] = res['Impacto'].round(2)
     res = res.rename(columns={col_forma: 'Forma de Entrega'})
+    
+    # Selecionar apenas as colunas relevantes para exibição
+    res = res[['Forma de Entrega', 'Vendas', 'Cancelados', 'Devoluções', 'Vendas Líquidas', 'Taxa (%)', 'Impacto (R$)']]
     
     return res
 

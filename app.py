@@ -725,16 +725,22 @@ else:
 
     # ─── TAB 4: FRETE ───
     with tab4:
-        st.subheader("🚚 Análise de Frete e Forma de Entrega")
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">🚚 Análise de Frete e Forma de Entrega</div>', unsafe_allow_html=True)
         df_frete = analisar_frete(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global)
         if len(df_frete) > 0:
             df_frete_display = df_frete.copy()
-            df_frete_display['Vendas'] = df_frete_display['Vendas'].apply(lambda x: formatar_numero(x))
+            # Formatar todas as colunas numéricas
+            df_frete_display['Vendas'] = df_frete_display['Vendas'].astype(int).apply(lambda x: formatar_numero(x))
+            df_frete_display['Cancelados'] = df_frete_display['Cancelados'].astype(int).apply(lambda x: formatar_numero(x))
+            df_frete_display['Devoluções'] = df_frete_display['Devoluções'].astype(int).apply(lambda x: formatar_numero(x))
+            df_frete_display['Vendas Líquidas'] = df_frete_display['Vendas Líquidas'].astype(int).apply(lambda x: formatar_numero(x))
             df_frete_display['Taxa (%)'] = df_frete_display['Taxa (%)'].apply(lambda x: formatar_pct_direto(x))
             df_frete_display['Impacto (R$)'] = df_frete_display['Impacto (R$)'].apply(lambda x: formatar_brl(x))
             st.dataframe(df_frete_display, use_container_width=True, hide_index=True)
         else:
             st.info("Sem dados disponíveis")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ─── TAB 5: MOTIVOS ───
     with tab5:
