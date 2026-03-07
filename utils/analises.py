@@ -182,6 +182,7 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     
     res['Taxa'] = res.apply(lambda x: (x['Devoluções'] / (x['Vendas'] - x['Cancelados']) * 100) if (x['Vendas'] - x['Cancelados']) > 0 else 0, axis=1).round(1)
     res['Risco'] = (res['Impacto'] / res['Vendas']).round(2)
+    res['Dev'] = res['Devoluções']
     res['Dev.'] = res['Devoluções']
     res['Reemb.'] = res['Impacto']
     res['Custo Dev.'] = 0.0
