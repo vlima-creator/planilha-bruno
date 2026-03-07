@@ -130,10 +130,20 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
     col_ads = 'Venda por publicidade'
-    col_receita = 'Preço unitário (BRL)'
+    # Tentar encontrar a coluna de receita correta (ML ou Shopee)
+    col_receita = 'Receita por produtos (BRL)'
+    if col_receita not in vendas_periodo.columns:
+        col_receita = 'Subtotal do produto' # Shopee fallback
+    if col_receita not in vendas_periodo.columns:
+        col_receita = 'Preço unitário (BRL)' # Outro fallback
     
     if col_ads not in vendas_periodo.columns: vendas_periodo[col_ads] = 'Não'
-    if col_receita not in vendas_periodo.columns: vendas_periodo[col_receita] = 0.0
+    
+    # Garantir que a coluna de receita seja numérica
+    if col_receita in vendas_periodo.columns:
+        vendas_periodo[col_receita] = pd.to_numeric(vendas_periodo[col_receita], errors='coerce').fillna(0.0)
+    else:
+        vendas_periodo[col_receita] = 0.0
         
     dev_ids = set(todas_dev['N.º de venda'].unique()) if not todas_dev.empty else set()
     
@@ -144,11 +154,20 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     
     impacto_map = {}
     if not todas_dev.empty:
-        val_col = 'Cancelamentos e reembolsos (BRL)' if 'Cancelamentos e reembolsos (BRL)' in todas_dev.columns else todas_dev.columns[0]
+        # Priorizar coluna de reembolso já identificada como correta
+        val_col = 'Cancelamentos e reembolsos (BRL)'
+        if val_col not in todas_dev.columns:
+            # Fallback para Shopee ou outras colunas de valor
+            val_col = 'Quantia total de reembolsos' if 'Quantia total de reembolsos' in todas_dev.columns else todas_dev.columns[0]
+            
         todas_dev['valor_temp'] = pd.to_numeric(todas_dev[val_col], errors='coerce').fillna(0).abs()
         impacto_map = todas_dev.groupby('N.º de venda')['valor_temp'].sum().to_dict()
 
     vendas_periodo['valor_dev'] = vendas_periodo.apply(lambda x: impacto_map.get(x['N.º de venda'], 0.0) if x['is_devolucao'] else 0.0, axis=1)
+    
+    # Criar coluna de receita efetiva (apenas para vendas não canceladas)
+    vendas_periodo['receita_efetiva'] = vendas_periodo.apply(lambda x: x[col_receita] if not x['is_cancelado'] else 0.0, axis=1)
+    
     vendas_periodo['Tipo'] = vendas_periodo[col_ads].apply(lambda x: 'Com Publicidade' if x == 'Sim' else 'Orgânico')
     
     res = vendas_periodo.groupby('Tipo').agg(
@@ -156,7 +175,7 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
         Cancelados=('is_cancelado', 'sum'),
         Devoluções=('is_devolucao', 'sum'),
         Impacto=('valor_dev', 'sum'),
-        Receita=(col_receita, 'sum')
+        Receita=('receita_efetiva', 'sum')
     ).reset_index()
     
     res['Taxa (%)'] = res.apply(lambda x: (x['Devoluções'] / (x['Vendas'] - x['Cancelados']) * 100) if (x['Vendas'] - x['Cancelados']) > 0 else 0, axis=1).round(1)
