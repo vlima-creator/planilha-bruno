@@ -801,26 +801,13 @@ else:
             else:
                 st.info("Nenhum motivo encontrado com os filtros aplicados.")
 
-            # 2. Tabela Detalhada (Resumo por Motivo)
+            # 2. Tabela Resumo por Motivo
             st.markdown("---")
             st.markdown('<div class="chart-title">Resumo por Motivo</div>', unsafe_allow_html=True)
             
             df_resumo = df_motivos_agg.sort_values('Quantidade', ascending=False).copy()
             df_resumo['%'] = df_resumo['%'].apply(lambda x: f"{x}%")
             st.dataframe(df_resumo[['Motivo', 'Quantidade', '%']], use_container_width=True, hide_index=True)
-
-            # 3. Detalhamento das Devoluções
-            st.markdown("---")
-            st.markdown('<div class="chart-title">Detalhamento das Devoluções</div>', unsafe_allow_html=True)
-            
-            df_display = df_filtered.copy()
-            # Selecionar e renomear colunas para exibição
-            cols_to_show = ['Motivo', 'SKU', 'Título do anúncio', 'N.º de venda']
-            # Verificar se as colunas existem antes de selecionar
-            cols_to_show = [c for c in cols_to_show if c in df_display.columns]
-            
-            df_display = df_display[cols_to_show]
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
             
         else:
             st.info("Sem dados de devolução disponíveis para o período selecionado.")
