@@ -777,13 +777,18 @@ else:
             st.markdown('<div class="chart-title">Distribuição de Motivos (Filtrado)</div>', unsafe_allow_html=True)
             
             df_motivos_agg = df_filtered.groupby('Motivo').size().reset_index(name='Quantidade')
+            total_devs = df_motivos_agg['Quantidade'].sum()
+            df_motivos_agg['%'] = (df_motivos_agg['Quantidade'] / total_devs * 100).round(1)
             df_motivos_agg = df_motivos_agg.sort_values('Quantidade', ascending=True)
             
             if not df_motivos_agg.empty:
+                # Criar texto para as barras com Quantidade e %
+                bar_text = [f"{q} ({p}%)" for q, p in zip(df_motivos_agg['Quantidade'], df_motivos_agg['%'])]
+                
                 fig = go.Figure(go.Bar(
                     x=df_motivos_agg['Quantidade'], y=df_motivos_agg['Motivo'],
                     orientation='h', marker_color='#f59e0b',
-                    text=df_motivos_agg['Quantidade'], textposition='outside'
+                    text=bar_text, textposition='outside'
                 ))
                 fig.update_layout(
                     template='plotly_dark',
@@ -796,7 +801,15 @@ else:
             else:
                 st.info("Nenhum motivo encontrado com os filtros aplicados.")
 
-            # 2. Tabela Detalhada
+            # 2. Tabela Detalhada (Resumo por Motivo)
+            st.markdown("---")
+            st.markdown('<div class="chart-title">Resumo por Motivo</div>', unsafe_allow_html=True)
+            
+            df_resumo = df_motivos_agg.sort_values('Quantidade', ascending=False).copy()
+            df_resumo['%'] = df_resumo['%'].apply(lambda x: f"{x}%")
+            st.dataframe(df_resumo[['Motivo', 'Quantidade', '%']], use_container_width=True, hide_index=True)
+
+            # 3. Detalhamento das Devoluções
             st.markdown("---")
             st.markdown('<div class="chart-title">Detalhamento das Devoluções</div>', unsafe_allow_html=True)
             

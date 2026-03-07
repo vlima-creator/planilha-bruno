@@ -99,10 +99,14 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
     """Análise qualitativa de motivos de devolução com suporte a SKU e Produto."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
-    # ML e Shopee usam 'Motivo do resultado' no parser ou no arquivo original
-    # No ML original é 'Motivo do resultado'
+    # Priorizar 'Estado' como o motivo real (Resultado da devolução)
+    # Se 'Estado' não existir, tenta 'Resultado', depois 'Motivo do resultado'
     col_motivo = None
-    if 'Motivo' in todas_dev.columns:
+    if 'Estado' in todas_dev.columns:
+        col_motivo = 'Estado'
+    elif 'Resultado' in todas_dev.columns:
+        col_motivo = 'Resultado'
+    elif 'Motivo' in todas_dev.columns:
         col_motivo = 'Motivo'
     elif 'Motivo do resultado' in todas_dev.columns:
         col_motivo = 'Motivo do resultado'
@@ -111,7 +115,11 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
         return pd.DataFrame()
         
     # Renomear coluna de motivo para padrão 'Motivo' antes de qualquer outra coisa
+    # Mas primeiro, se a coluna for 'Estado', vamos garantir que não estamos sobrescrevendo algo importante
     if col_motivo != 'Motivo':
+        # Se já existir uma coluna 'Motivo', vamos renomeá-la para 'Motivo Original' para não perder o dado
+        if 'Motivo' in todas_dev.columns and col_motivo != 'Motivo':
+            todas_dev = todas_dev.rename(columns={'Motivo': 'Motivo Original'})
         todas_dev = todas_dev.rename(columns={col_motivo: 'Motivo'})
 
     # Tentar trazer SKU e Produto das vendas para as devoluções
