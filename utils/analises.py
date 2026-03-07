@@ -58,18 +58,28 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     # Garantir colunas básicas
     if col_frete not in vendas_periodo.columns:
         vendas_periodo[col_frete] = 0.0
+    
+    # Tratar Forma de entrega em branco
     if col_entrega not in vendas_periodo.columns:
         vendas_periodo[col_entrega] = 'Não informado'
+    else:
+        vendas_periodo[col_entrega] = vendas_periodo[col_entrega].fillna('Não informado').replace('', 'Não informado')
+        
     if col_valor_dev not in todas_dev.columns:
         todas_dev[col_valor_dev] = 0.0
         
-    # Cruzar vendas com devoluções
-    df_merged = pd.merge(vendas_periodo, todas_dev[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
+    # CORREÇÃO CRÍTICA: Remover duplicatas de devoluções antes do merge para evitar explosão de linhas
+    # e garantir que cada venda conte apenas como 1 devolução se houver no relatório de devoluções
+    todas_dev_unicas = todas_dev.drop_duplicates(subset=['N.º de venda']).copy()
+    
+    # Cruzar vendas com devoluções únicas
+    df_merged = pd.merge(vendas_periodo, todas_dev_unicas[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     
     # Identificar coluna de valor após merge
     col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
     
-    df_merged['tem_dev'] = df_merged[col_valor_final].notna()
+    # Uma venda é considerada devolução apenas se o valor de reembolso for diferente de zero ou se estiver no relatório
+    df_merged['tem_dev'] = df_merged[col_valor_final].notna() & (df_merged[col_valor_final] != 0)
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     
     # Agrupar por Forma de Entrega
@@ -124,11 +134,12 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     if col_receita not in vendas_periodo.columns:
         vendas_periodo[col_receita] = 0.0
         
-    # Cruzar com devoluções
-    df_merged = pd.merge(vendas_periodo, todas_dev[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
+    # Cruzar com devoluções únicas
+    todas_dev_unicas = todas_dev.drop_duplicates(subset=['N.º de venda']).copy()
+    df_merged = pd.merge(vendas_periodo, todas_dev_unicas[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
     
-    df_merged['tem_dev'] = df_merged[col_valor_final].notna()
+    df_merged['tem_dev'] = df_merged[col_valor_final].notna() & (df_merged[col_valor_final] != 0)
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     df_merged['Tipo'] = df_merged[col_ads].apply(lambda x: 'Com Publicidade' if x == 'Sim' else 'Orgânico')
     
@@ -169,13 +180,13 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     if todas_dev.empty or 'N.º de venda' not in todas_dev.columns:
         return garantir_colunas_app(pd.DataFrame()), 0
     
-    todas_dev = todas_dev.drop_duplicates(subset=['N.º de venda'])
-    todas_dev_validas = todas_dev[todas_dev[col_valor] != 0].copy()
+    todas_dev_unicas = todas_dev.drop_duplicates(subset=['N.º de venda']).copy()
+    todas_dev_validas = todas_dev_unicas[todas_dev_unicas[col_valor] != 0].copy()
     
     df_merged = pd.merge(vendas_periodo, todas_dev_validas[['N.º de venda', col_valor]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     col_valor_final = col_valor if col_valor in df_merged.columns else f"{col_valor}_dev"
     
-    df_merged['tem_dev'] = df_merged[col_valor_final].notna()
+    df_merged['tem_dev'] = df_merged[col_valor_final].notna() & (df_merged[col_valor_final] != 0)
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     df_merged['Dev'] = df_merged['tem_dev'].astype(int)
     
