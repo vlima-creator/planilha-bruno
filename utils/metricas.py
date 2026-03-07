@@ -98,6 +98,7 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
             venda_com_devolucao.add(num_venda)
             
             for dev in dev_map[num_venda]:
+                # CORREÇÃO: Usar coluna correta de reembolso
                 reembolso = dev.get('Cancelamentos e reembolsos (BRL)', None)
                 if reembolso is None or pd.isna(reembolso):
                     reembolso = 0.0
@@ -127,7 +128,7 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                 impacto_devolucao += reembolso
                 perda_total += perda_total_item
                 perda_parcial += perda_parcial_item
-    
+                
     devolucoes_count = len(venda_com_devolucao)
     vendas_enviadas = vendas_totais - vendas_canceladas_count
     vendas_liquidas = vendas_enviadas - devolucoes_count
@@ -155,6 +156,32 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     }
 
 def calcular_qualidade_arquivo(data):
-    """Calcula qualidade do arquivo"""
-    # Placeholder para manter compatibilidade
-    return 100
+    """Calcula qualidade do arquivo com as chaves esperadas pelo export.py"""
+    vendas = data['vendas']
+    matriz = data['matriz'] if data['matriz'] is not None else pd.DataFrame()
+    full = data['full'] if data['full'] is not None else pd.DataFrame()
+    
+    def get_stats(df):
+        if df.empty:
+            return {
+                'sem_sku_pct': 0,
+                'sem_data_pct': 0,
+                'sem_numero_venda_pct': 0,
+                'sem_motivo_pct': 0,
+                'sem_estado_pct': 0
+            }
+        
+        total = len(df)
+        return {
+            'sem_sku_pct': (df['SKU'].isna().sum() / total * 100) if 'SKU' in df.columns else 100,
+            'sem_data_pct': (df['Data da venda'].isna().sum() / total * 100) if 'Data da venda' in df.columns else 100,
+            'sem_numero_venda_pct': (df['N.º de venda'].isna().sum() / total * 100) if 'N.º de venda' in df.columns else 100,
+            'sem_motivo_pct': (df['Motivo'].isna().sum() / total * 100) if 'Motivo' in df.columns else 0,
+            'sem_estado_pct': (df['Estado'].isna().sum() / total * 100) if 'Estado' in df.columns else 0
+        }
+
+    return {
+        'vendas': get_stats(vendas),
+        'matriz': get_stats(matriz),
+        'full': get_stats(full)
+    }

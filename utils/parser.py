@@ -94,6 +94,9 @@ def ler_vendas(file):
             df['Venda por publicidade'] = 'Não'
             if 'Status do pedido' in df.columns:
                 df['Estado'] = df['Status do pedido']
+                df['is_cancelado'] = df['Estado'].astype(str).str.lower().str.contains('cancelado|cancelada', na=False)
+            else:
+                df['is_cancelado'] = False
             
             if 'Método de envio' in df.columns and 'Opção de envio' in df.columns:
                 df['Forma de entrega'] = df.apply(

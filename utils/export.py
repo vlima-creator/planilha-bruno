@@ -100,6 +100,7 @@ def exportar_xlsx(data):
         ws_skus = writer.sheets['Ranking de SKUs']
         aplicar_estilo_cabecalho(ws_skus, len(df_skus.columns))
         # Colunas: SKU, Vendas, Dev, Impacto, Taxa
+        # No ranking de SKUs, Impacto é a 4ª coluna e Taxa é a 5ª
         formatar_valores_excel(ws_skus, [4], [5])
         ajustar_largura_colunas(ws_skus)
 
