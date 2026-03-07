@@ -750,45 +750,67 @@ else:
     # ─── TAB 5: MOTIVOS ───
     with tab5:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.markdown('<div class="chart-title">Distribuição de Motivos</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">🔍 Filtros de Devolução</div>', unsafe_allow_html=True)
         
-        df_motivos = analisar_motivos(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global)
-        
-        if len(df_motivos) > 0:
-            df_motivos_sorted = df_motivos.sort_values('Quantidade', ascending=True)
-            fig = go.Figure(go.Bar(
-                x=df_motivos_sorted['Quantidade'], y=df_motivos_sorted['Motivo'],
-                orientation='h', marker_color='#f59e0b',
-                text=df_motivos_sorted['Quantidade'], textposition='outside'
-            ))
-            fig.update_layout(
-                template='plotly_dark',
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                title='',
-                xaxis=dict(title='Quantidade', showgrid=True, gridcolor='#334155'),
-                yaxis=dict(title=''), height=400, margin=dict(l=250, r=50)
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Sem dados disponíveis")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        col_search, col_empty = st.columns([1, 4])
-        with col_search:
-            search_motivo = st.text_input("Buscar motivo...", "")
-        
-        if len(df_motivos) > 0:
-            if search_motivo:
-                df_motivos_filtered = df_motivos[df_motivos['Motivo'].str.contains(search_motivo, case=False, na=False)]
-            else:
-                df_motivos_filtered = df_motivos
+        col_s1, col_s2, col_s3 = st.columns(3)
+        with col_s1:
+            search_motivo = st.text_input("Buscar por Motivo...", "")
+        with col_s2:
+            search_sku = st.text_input("Buscar por SKU...", "")
+        with col_s3:
+            search_produto = st.text_input("Buscar por Produto...", "")
             
-            df_motivos_display = df_motivos_filtered.copy()
-            df_motivos_display['%'] = df_motivos_display['Percentual (%)'].apply(lambda x: formatar_pct_direto(x))
-            df_motivos_display = df_motivos_display[['Motivo', 'Quantidade', '%']]
-            st.dataframe(df_motivos_display, use_container_width=True, hide_index=True)
+        df_dev_raw = analisar_motivos(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global)
+        
+        if not df_dev_raw.empty:
+            # Aplicar filtros de busca
+            df_filtered = df_dev_raw.copy()
+            if search_motivo:
+                df_filtered = df_filtered[df_filtered['Motivo'].str.contains(search_motivo, case=False, na=False)]
+            if search_sku:
+                df_filtered = df_filtered[df_filtered['SKU'].str.contains(search_sku, case=False, na=False)]
+            if search_produto:
+                df_filtered = df_filtered[df_filtered['Título do anúncio'].str.contains(search_produto, case=False, na=False)]
+            
+            # 1. Gráfico de Motivos (Baseado nos dados filtrados)
+            st.markdown("---")
+            st.markdown('<div class="chart-title">Distribuição de Motivos (Filtrado)</div>', unsafe_allow_html=True)
+            
+            df_motivos_agg = df_filtered.groupby('Motivo').size().reset_index(name='Quantidade')
+            df_motivos_agg = df_motivos_agg.sort_values('Quantidade', ascending=True)
+            
+            if not df_motivos_agg.empty:
+                fig = go.Figure(go.Bar(
+                    x=df_motivos_agg['Quantidade'], y=df_motivos_agg['Motivo'],
+                    orientation='h', marker_color='#f59e0b',
+                    text=df_motivos_agg['Quantidade'], textposition='outside'
+                ))
+                fig.update_layout(
+                    template='plotly_dark',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    xaxis=dict(title='Quantidade', showgrid=True, gridcolor='#334155'),
+                    yaxis=dict(title=''), height=max(300, len(df_motivos_agg) * 30), margin=dict(l=250, r=50)
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Nenhum motivo encontrado com os filtros aplicados.")
+
+            # 2. Tabela Detalhada
+            st.markdown("---")
+            st.markdown('<div class="chart-title">Detalhamento das Devoluções</div>', unsafe_allow_html=True)
+            
+            df_display = df_filtered.copy()
+            # Selecionar e renomear colunas para exibição
+            cols_to_show = ['Motivo', 'SKU', 'Título do anúncio', 'N.º de venda']
+            # Verificar se as colunas existem antes de selecionar
+            cols_to_show = [c for c in cols_to_show if c in df_display.columns]
+            
+            df_display = df_display[cols_to_show]
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            
+        else:
+            st.info("Sem dados de devolução disponíveis para o período selecionado.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ─── TAB 6: ADS ───

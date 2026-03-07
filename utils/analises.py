@@ -90,17 +90,35 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     return res[cols_ordem]
 
 def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
-    """Análise qualitativa de motivos de devolução."""
+    """Análise qualitativa de motivos de devolução com suporte a SKU e Produto."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
-    if 'Motivo' not in todas_dev.columns:
+    # ML usa 'Motivo', Shopee usa 'Motivo do resultado' (mapeado no parser)
+    col_motivo = 'Motivo' if 'Motivo' in todas_dev.columns else ('Motivo do resultado' if 'Motivo do resultado' in todas_dev.columns else None)
+    
+    if not col_motivo or todas_dev.empty:
         return pd.DataFrame()
         
-    res = todas_dev.groupby('Motivo').size().reset_index(name='Quantidade')
-    res = res.sort_values('Quantidade', ascending=False)
-    res['Percentual (%)'] = (res['Quantidade'] / res['Quantidade'].sum() * 100).round(1)
+    # Tentar trazer SKU e Produto das vendas para as devoluções
+    if 'N.º de venda' in todas_dev.columns and 'N.º de venda' in vendas_periodo.columns:
+        cols_vendas = ['N.º de venda']
+        if 'SKU' in vendas_periodo.columns: cols_vendas.append('SKU')
+        if 'Título do anúncio' in vendas_periodo.columns: cols_vendas.append('Título do anúncio')
+        
+        vendas_subset = vendas_periodo[cols_vendas].drop_duplicates(subset=['N.º de venda'])
+        todas_dev = pd.merge(todas_dev, vendas_subset, on='N.º de venda', how='left')
+
+    # Garantir que as colunas existam para não quebrar o agrupamento posterior
+    if 'SKU' not in todas_dev.columns: todas_dev['SKU'] = 'Não informado'
+    if 'Título do anúncio' not in todas_dev.columns: todas_dev['Título do anúncio'] = 'Não informado'
     
-    return res
+    # Renomear coluna de motivo para padrão 'Motivo'
+    if col_motivo != 'Motivo':
+        todas_dev = todas_dev.rename(columns={col_motivo: 'Motivo'})
+    
+    # Agrupar mantendo SKU e Produto se possível (usando o primeiro encontrado para cada motivo)
+    # Mas o ideal é retornar os dados brutos de devolução para o app filtrar
+    return todas_dev
 
 def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     """Análise de impacto de devoluções em campanhas de Ads."""
