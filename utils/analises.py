@@ -99,24 +99,34 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
     """Análise qualitativa de motivos de devolução com suporte a SKU e Produto."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
-    # ML usa 'Motivo', Shopee usa 'Motivo do resultado' (mapeado no parser)
-    col_motivo = 'Motivo' if 'Motivo' in todas_dev.columns else ('Motivo do resultado' if 'Motivo do resultado' in todas_dev.columns else None)
+    # ML e Shopee usam 'Motivo do resultado' no parser ou no arquivo original
+    # No ML original é 'Motivo do resultado'
+    col_motivo = None
+    if 'Motivo' in todas_dev.columns:
+        col_motivo = 'Motivo'
+    elif 'Motivo do resultado' in todas_dev.columns:
+        col_motivo = 'Motivo do resultado'
     
     if not col_motivo or todas_dev.empty:
         return pd.DataFrame()
         
+    # Renomear coluna de motivo para padrão 'Motivo' antes de qualquer outra coisa
+    if col_motivo != 'Motivo':
+        todas_dev = todas_dev.rename(columns={col_motivo: 'Motivo'})
+
     # Tentar trazer SKU e Produto das vendas para as devoluções
     if 'N.º de venda' in todas_dev.columns and 'N.º de venda' in vendas_periodo.columns:
+        # Remover colunas SKU e Título do anúncio se já existirem em todas_dev para evitar duplicatas no merge
+        cols_to_drop = [c for c in ['SKU', 'Título do anúncio'] if c in todas_dev.columns]
+        if cols_to_drop:
+            todas_dev = todas_dev.drop(columns=cols_to_drop)
+
         cols_vendas = ['N.º de venda']
         if 'SKU' in vendas_periodo.columns: cols_vendas.append('SKU')
         if 'Título do anúncio' in vendas_periodo.columns: cols_vendas.append('Título do anúncio')
         
         vendas_subset = vendas_periodo[cols_vendas].drop_duplicates(subset=['N.º de venda'])
         todas_dev = pd.merge(todas_dev, vendas_subset, on='N.º de venda', how='left')
-
-    # Renomear coluna de motivo para padrão 'Motivo'
-    if col_motivo != 'Motivo':
-        todas_dev = todas_dev.rename(columns={col_motivo: 'Motivo'})
 
     # Garantir que as colunas existam e preencher valores nulos
     if 'SKU' not in todas_dev.columns: todas_dev['SKU'] = 'Não informado'
@@ -125,8 +135,12 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
     if 'Título do anúncio' not in todas_dev.columns: todas_dev['Título do anúncio'] = 'Não informado'
     else: todas_dev['Título do anúncio'] = todas_dev['Título do anúncio'].fillna('Não informado')
     
-    if 'Motivo' not in todas_dev.columns: todas_dev['Motivo'] = 'Não informado'
-    else: todas_dev['Motivo'] = todas_dev['Motivo'].fillna('Não informado')
+    if 'Motivo' not in todas_dev.columns: 
+        todas_dev['Motivo'] = 'Não informado'
+    else: 
+        todas_dev['Motivo'] = todas_dev['Motivo'].fillna('Não informado')
+        # Tratar strings vazias ou apenas com espaços
+        todas_dev['Motivo'] = todas_dev['Motivo'].replace(r'^\s*$', 'Não informado', regex=True)
     
     # Agrupar mantendo SKU e Produto se possível (usando o primeiro encontrado para cada motivo)
     # Mas o ideal é retornar os dados brutos de devolução para o app filtrar
