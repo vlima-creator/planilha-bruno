@@ -72,15 +72,10 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     df_merged['tem_dev'] = df_merged[col_valor_final].notna()
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     
-    # Identificar cancelados (valor_dev > 0 mas sem ser devolução marcada - simplificação se necessário)
-    # No contexto atual, vamos considerar devoluções como cancelados para preencher a tabela se não houver distinção clara
-    df_merged['is_cancelado'] = False # Placeholder se não houver lógica de cancelamento clara
-    
     # Agrupar por Forma de Entrega
     res = df_merged.groupby(col_entrega).agg(
         Vendas=('N.º de venda', 'count'),
         Devoluções=('tem_dev', 'sum'),
-        Cancelados=('is_cancelado', 'sum'),
         Impacto=('valor_dev', 'sum')
     ).reset_index()
     
@@ -88,7 +83,8 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     res = res.rename(columns={col_entrega: 'Forma de Entrega'})
     
     # Cálculos adicionais
-    res['Vendas Líquidas'] = res['Vendas'] - res['Devoluções'] - res['Cancelados']
+    res['Cancelados'] = 0 # Placeholder
+    res['Vendas Líquidas'] = res['Vendas'] - res['Devoluções']
     res['Taxa (%)'] = (res['Devoluções'] / res['Vendas'] * 100).round(1).fillna(0)
     
     # Renomear para o que o app.py espera na exibição
@@ -109,98 +105,97 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
     if 'Motivo' not in todas_dev.columns:
         return pd.DataFrame()
         
-    res = todas_dev.groupby('Motivo').size().reset_index(name='Qtd')
-    res = res.sort_values('Qtd', ascending=False)
-    res['Pct'] = (res['Qtd'] / res['Qtd'].sum() * 100).round(1)
+    res = todas_dev.groupby('Motivo').size().reset_index(name='Quantidade')
+    res = res.sort_values('Quantidade', ascending=False)
+    res['Percentual (%)'] = (res['Quantidade'] / res['Quantidade'].sum() * 100).round(1)
     
     return res
 
-def analisar_ads(vendas, matriz, full, ads_data):
+def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     """Análise de impacto de devoluções em campanhas de Ads."""
-    # Placeholder para futura implementação
-    return {
-        'acos_real': 0.0,
-        'roas_real': 0.0,
-        'perda_investimento': 0.0
-    }
+    vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
+    
+    col_ads = 'Venda por publicidade'
+    col_valor_dev = 'Cancelamentos e reembolsos (BRL)'
+    col_receita = 'Preço unitário (BRL)'
+    
+    if col_ads not in vendas_periodo.columns:
+        vendas_periodo[col_ads] = 'Não'
+    if col_receita not in vendas_periodo.columns:
+        vendas_periodo[col_receita] = 0.0
+        
+    # Cruzar com devoluções
+    df_merged = pd.merge(vendas_periodo, todas_dev[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
+    col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
+    
+    df_merged['tem_dev'] = df_merged[col_valor_final].notna()
+    df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
+    df_merged['Tipo'] = df_merged[col_ads].apply(lambda x: 'Com Publicidade' if x == 'Sim' else 'Orgânico')
+    
+    # Agrupar por Tipo (Ads vs Orgânico)
+    res = df_merged.groupby('Tipo').agg(
+        Vendas=('N.º de venda', 'count'),
+        Devoluções=('tem_dev', 'sum'),
+        Impacto=('valor_dev', 'sum'),
+        Receita=(col_receita, 'sum')
+    ).reset_index()
+    
+    res['Taxa (%)'] = (res['Devoluções'] / res['Vendas'] * 100).round(1).fillna(0)
+    res = res.rename(columns={'Impacto': 'Impacto (R$)', 'Receita': 'Receita (R$)'})
+    
+    return res
 
 def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupar_por='SKU'):
     """Análise por SKU ou Produto."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
     if agrupar_por not in vendas_periodo.columns:
-        # Fallback se a coluna não existir
         agrupar_por = 'SKU' if 'SKU' in vendas_periodo.columns else (vendas_periodo.columns[0] if not vendas_periodo.empty else 'SKU')
         
     col_valor = 'Cancelamentos e reembolsos (BRL)'
     if col_valor not in todas_dev.columns: 
         todas_dev[col_valor] = 0.0
     
-    # Função para garantir todas as colunas que o app.py espera
     def garantir_colunas_app(df):
         cols_esperadas = {
-            'Vendas': 0,
-            'Dev.': 0,
-            'Taxa': 0.0,
-            'Impacto': 0.0,
-            'Reemb.': 0.0,
-            'Custo Dev.': 0.0,
-            'Risco': 0.0,
-            'Classe': 'C',
-            'Dev': 0 # Fallback para uso interno se necessário
+            'Vendas': 0, 'Dev.': 0, 'Taxa': 0.0, 'Impacto': 0.0, 'Reemb.': 0.0,
+            'Custo Dev.': 0.0, 'Risco': 0.0, 'Classe': 'C', 'Dev': 0
         }
         for col, val in cols_esperadas.items():
             if col not in df.columns:
                 df[col] = val
         return df
 
-    # Se todas_dev estiver vazio ou não tiver ID de venda, retornamos algo vazio mas estruturado
     if todas_dev.empty or 'N.º de venda' not in todas_dev.columns:
         return garantir_colunas_app(pd.DataFrame()), 0
     
-    # Remover duplicatas por pedido (evita contar o mesmo pedido múltiplas vezes)
     todas_dev = todas_dev.drop_duplicates(subset=['N.º de venda'])
-    
-    # Filtrar devoluções com valor != 0 (não > 0) porque ML retorna valores negativos
     todas_dev_validas = todas_dev[todas_dev[col_valor] != 0].copy()
     
-    # Merge vendas com devoluções
-    # Usamos suffixes para evitar conflitos se col_valor already exist in vendas_periodo
     df_merged = pd.merge(vendas_periodo, todas_dev_validas[['N.º de venda', col_valor]], on='N.º de venda', how='left', suffixes=('', '_dev'))
-    
-    # Identificar qual nome de coluna o merge gerou para o valor de devolução
     col_valor_final = col_valor if col_valor in df_merged.columns else f"{col_valor}_dev"
     
     df_merged['tem_dev'] = df_merged[col_valor_final].notna()
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
-    
-    # Adicionar coluna 'Dev' para compatibilidade com a linha 661 do app.py
     df_merged['Dev'] = df_merged['tem_dev'].astype(int)
     
-    # Agrupar por SKU/Produto
     if agrupar_por in df_merged.columns:
-        # Agrupar e calcular métricas básicas
         res = df_merged.groupby(agrupar_por).agg(
             Vendas=('N.º de venda', 'count'),
             Dev=('Dev', 'sum'),
             **{'Dev.': ('tem_dev', 'sum')}
         ).reset_index()
         
-        # Calcular Impacto e Reembolso separadamente para garantir precisão
         impacto_por_sku = df_merged.groupby(agrupar_por)['valor_dev'].sum()
         reemb_por_sku = df_merged.groupby(agrupar_por)[col_valor_final].sum().abs()
         
-        # Mapear os valores de volta para o dataframe de resultado
         res['Impacto'] = res[agrupar_por].map(impacto_por_sku)
         res['Reemb.'] = res[agrupar_por].map(reemb_por_sku)
-        
         res['Taxa'] = (res['Dev.'] / res['Vendas'] * 100).round(1)
-        res['Custo Dev.'] = 0.0  # Placeholder
+        res['Custo Dev.'] = 0.0
         res['Risco'] = (res['Impacto'] / res['Vendas']).round(2)
         
-        # Classificação ABC por impacto
         if len(res) > 0:
-            # Ordenar por impacto antes do cálculo ABC
             res = res.sort_values('Impacto', ascending=False)
             impacto_total = res['Impacto'].sum()
             if impacto_total > 0:
@@ -214,9 +209,7 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
         if limit:
             res = res.head(limit)
         
-        # Total de devoluções únicas
         total_dev = res['Dev'].sum()
-        
         return garantir_colunas_app(res), total_dev
     
     return garantir_colunas_app(pd.DataFrame()), 0
@@ -225,13 +218,9 @@ def simular_reducao(skus_data, percentual_reducao):
     """Simula redução de devoluções."""
     if skus_data.empty:
         return pd.DataFrame()
-    
     resultado = skus_data.copy()
-    
     if 'Dev.' in resultado.columns and 'Impacto' in resultado.columns:
-        # Reduzir devoluções pelo percentual
         resultado['Dev._Simulado'] = (resultado['Dev.'] * (1 - percentual_reducao / 100)).round(0)
         resultado['Impacto_Simulado'] = (resultado['Impacto'] * (1 - percentual_reducao / 100)).round(2)
         resultado['Economia'] = (resultado['Impacto'] - resultado['Impacto_Simulado']).round(2)
-        
     return resultado
