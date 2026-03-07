@@ -3,3 +3,14 @@ __pycache__/
 .env
 .streamlit/
 shopee_data/
+
+# Frontend/Node
+node_modules/
+dist/
+.vite/
+
+# System
+.DS_Store
+*.xlsx
+*.xls
+*.csv
