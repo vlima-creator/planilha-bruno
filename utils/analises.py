@@ -196,26 +196,46 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     vendas_periodo['is_devolucao'] = vendas_periodo.apply(lambda x: (x['N.º de venda'] in dev_ids) and (not x['is_cancelado']), axis=1)
     
     impacto_map = {}
+    custo_log_map = {}
     if not todas_dev.empty:
-        val_col = 'Cancelamentos e reembolsos (BRL)' if 'Cancelamentos e reembolsos (BRL)' in todas_dev.columns else todas_dev.columns[0]
-        todas_dev['valor_temp'] = pd.to_numeric(todas_dev[val_col], errors='coerce').fillna(0).abs()
-        impacto_map = todas_dev.groupby('N.º de venda')['valor_temp'].sum().to_dict()
+        # 1. Reembolso (Impacto Financeiro)
+        val_col = 'Cancelamentos e reembolsos (BRL)'
+        if val_col not in todas_dev.columns:
+            val_col = 'Quantia total de reembolsos' if 'Quantia total de reembolsos' in todas_dev.columns else todas_dev.columns[0]
+        
+        # 2. Custos Logísticos (Tarifas de envio + Tarifas de venda)
+        # No ML, quando há devolução, o vendedor muitas vezes paga o frete de volta e perde a comissão
+        col_envio = 'Tarifas de envio (BRL)'
+        col_venda = 'Tarifa de venda e impostos (BRL)'
+        
+        todas_dev['reemb_temp'] = pd.to_numeric(todas_dev[val_col], errors='coerce').fillna(0).abs()
+        
+        custo_envio = pd.to_numeric(todas_dev[col_envio], errors='coerce').fillna(0).abs() if col_envio in todas_dev.columns else 0
+        custo_venda = pd.to_numeric(todas_dev[col_venda], errors='coerce').fillna(0).abs() if col_venda in todas_dev.columns else 0
+        todas_dev['custo_log_temp'] = custo_envio + custo_venda
+        
+        impacto_map = todas_dev.groupby('N.º de venda')['reemb_temp'].sum().to_dict()
+        custo_log_map = todas_dev.groupby('N.º de venda')['custo_log_temp'].sum().to_dict()
 
-    vendas_periodo['valor_dev'] = vendas_periodo.apply(lambda x: impacto_map.get(x['N.º de venda'], 0.0) if x['is_devolucao'] else 0.0, axis=1)
+    vendas_periodo['valor_reemb'] = vendas_periodo.apply(lambda x: impacto_map.get(x['N.º de venda'], 0.0) if x['is_devolucao'] else 0.0, axis=1)
+    vendas_periodo['valor_custo_log'] = vendas_periodo.apply(lambda x: custo_log_map.get(x['N.º de venda'], 0.0) if x['is_devolucao'] else 0.0, axis=1)
+    vendas_periodo['impacto_total_item'] = vendas_periodo['valor_reemb'] + vendas_periodo['valor_custo_log']
     
     res = vendas_periodo.groupby(agrupar_por).agg(
         Vendas=('N.º de venda', 'count'),
         Cancelados=('is_cancelado', 'sum'),
         Devoluções=('is_devolucao', 'sum'),
-        Impacto=('valor_dev', 'sum')
+        Reemb_Sum=('valor_reemb', 'sum'),
+        Custo_Log_Sum=('valor_custo_log', 'sum'),
+        Impacto=('impacto_total_item', 'sum')
     ).reset_index()
     
     res['Taxa'] = res.apply(lambda x: (x['Devoluções'] / (x['Vendas'] - x['Cancelados']) * 100) if (x['Vendas'] - x['Cancelados']) > 0 else 0, axis=1).round(1)
-    res['Risco'] = (res['Impacto'] / res['Vendas']).round(2)
+    res['Risco'] = (res['Impacto'] / res['Vendas']).round(0).astype(int)
     res['Dev'] = res['Devoluções']
     res['Dev.'] = res['Devoluções']
-    res['Reemb.'] = res['Impacto']
-    res['Custo Dev.'] = 0.0
+    res['Reemb.'] = res['Reemb_Sum']
+    res['Custo Dev.'] = res['Custo_Log_Sum']
     
     if len(res) > 0:
         res = res.sort_values('Impacto', ascending=False)
