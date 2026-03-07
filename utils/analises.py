@@ -67,8 +67,10 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
     
     # Uma venda é considerada devolução se estiver no relatório de devoluções E não for cancelada
-    df_merged['no_relatorio_dev'] = df_merged[col_valor_final].notna()
-    df_merged['is_devolucao'] = df_merged['no_relatorio_dev'] & (~df_merged['is_cancelado'])
+    # IMPORTANTE: No merge 'left', se a venda não estiver no relatório de devoluções, col_valor_final será NaN.
+    df_merged['is_devolucao'] = df_merged[col_valor_final].notna() & (~df_merged['is_cancelado'])
+    
+    # O impacto financeiro é o valor absoluto do reembolso
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     
     # Agrupar por Forma de Entrega
@@ -179,8 +181,8 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
         else:
             df_merged['is_cancelado'] = False
 
-    df_merged['no_relatorio_dev'] = df_merged[col_valor_final].notna()
-    df_merged['is_devolucao'] = df_merged['no_relatorio_dev'] & (~df_merged['is_cancelado'])
+    # Uma venda é considerada devolução se estiver no relatório de devoluções E não for cancelada
+    df_merged['is_devolucao'] = df_merged[col_valor_final].notna() & (~df_merged['is_cancelado'])
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     df_merged['Tipo'] = df_merged[col_ads].apply(lambda x: 'Com Publicidade' if x == 'Sim' else 'Orgânico')
     
@@ -234,8 +236,8 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     df_merged = pd.merge(vendas_periodo, todas_dev_unicas[['N.º de venda', col_valor]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     col_valor_final = col_valor if col_valor in df_merged.columns else f"{col_valor}_dev"
     
-    df_merged['no_relatorio_dev'] = df_merged[col_valor_final].notna()
-    df_merged['is_devolucao'] = df_merged['no_relatorio_dev'] & (~df_merged['is_cancelado'])
+    # Uma venda é considerada devolução se estiver no relatório de devoluções E não for cancelada
+    df_merged['is_devolucao'] = df_merged[col_valor_final].notna() & (~df_merged['is_cancelado'])
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     df_merged['Dev'] = df_merged['is_devolucao'].astype(int)
     
