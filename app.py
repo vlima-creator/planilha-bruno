@@ -468,7 +468,7 @@ else:
     with tab1:
         metricas = calcular_metricas(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global)
         
-        c1, c2, c3, c4, c5 = st.columns(5)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
         with c1:
             render_metric_card("VENDAS TOTAIS", formatar_numero(metricas['vendas']), "Total de pedidos", "🛒")
         with c2:
@@ -478,6 +478,8 @@ else:
         with c4:
             render_metric_card("FAT. DEVOLUÇÕES", formatar_brl(metricas['faturamento_devolucoes']), "", "📉")
         with c5:
+            render_metric_card("PERDA PARCIAL", formatar_brl(metricas['perda_parcial']), "", "📦")
+        with c6:
             render_metric_card("PERDA TOTAL", formatar_brl(metricas['perda_total']), "", "⚠️")
             
         st.markdown("<br>", unsafe_allow_html=True)
