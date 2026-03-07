@@ -10,6 +10,12 @@ def preparar_dados_analise(vendas, matriz, full):
     vendas_periodo = vendas.copy()
     todas_dev = pd.concat([matriz, full], ignore_index=True)
     
+    # Padronizar N.º de venda para string e remover espaços para garantir o merge
+    if 'N.º de venda' in vendas_periodo.columns:
+        vendas_periodo['N.º de venda'] = vendas_periodo['N.º de venda'].astype(str).str.strip()
+    if 'N.º de venda' in todas_dev.columns:
+        todas_dev['N.º de venda'] = todas_dev['N.º de venda'].astype(str).str.strip()
+
     # Verificar se temos as colunas mínimas para cruzamento
     tem_id_venda = 'N.º de venda' in vendas_periodo.columns and 'N.º de venda' in todas_dev.columns
     
@@ -108,13 +114,19 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
         vendas_subset = vendas_periodo[cols_vendas].drop_duplicates(subset=['N.º de venda'])
         todas_dev = pd.merge(todas_dev, vendas_subset, on='N.º de venda', how='left')
 
-    # Garantir que as colunas existam para não quebrar o agrupamento posterior
-    if 'SKU' not in todas_dev.columns: todas_dev['SKU'] = 'Não informado'
-    if 'Título do anúncio' not in todas_dev.columns: todas_dev['Título do anúncio'] = 'Não informado'
-    
     # Renomear coluna de motivo para padrão 'Motivo'
     if col_motivo != 'Motivo':
         todas_dev = todas_dev.rename(columns={col_motivo: 'Motivo'})
+
+    # Garantir que as colunas existam e preencher valores nulos
+    if 'SKU' not in todas_dev.columns: todas_dev['SKU'] = 'Não informado'
+    else: todas_dev['SKU'] = todas_dev['SKU'].fillna('Não informado')
+    
+    if 'Título do anúncio' not in todas_dev.columns: todas_dev['Título do anúncio'] = 'Não informado'
+    else: todas_dev['Título do anúncio'] = todas_dev['Título do anúncio'].fillna('Não informado')
+    
+    if 'Motivo' not in todas_dev.columns: todas_dev['Motivo'] = 'Não informado'
+    else: todas_dev['Motivo'] = todas_dev['Motivo'].fillna('Não informado')
     
     # Agrupar mantendo SKU e Produto se possível (usando o primeiro encontrado para cada motivo)
     # Mas o ideal é retornar os dados brutos de devolução para o app filtrar
