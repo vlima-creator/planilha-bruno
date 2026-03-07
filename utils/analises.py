@@ -90,10 +90,21 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
     col_motivo = None
-    for col in ['Estado', 'Resultado', 'Motivo', 'Motivo do resultado']:
+    # Priorizar 'Motivo do resultado' pois contém o motivo real preenchido pelo vendedor/comprador
+    # 'Estado' geralmente contém o status logístico da devolução
+    for col in ['Motivo do resultado', 'Motivo', 'Resultado', 'Estado']:
         if col in todas_dev.columns:
-            col_motivo = col
-            break
+            # Verificar se a coluna não está vazia ou apenas com espaços
+            if todas_dev[col].astype(str).str.strip().replace('', np.nan).notna().any():
+                col_motivo = col
+                break
+    
+    # Se não encontrou nenhuma com dados, usa a primeira disponível
+    if not col_motivo:
+        for col in ['Motivo do resultado', 'Motivo', 'Resultado', 'Estado']:
+            if col in todas_dev.columns:
+                col_motivo = col
+                break
     
     if not col_motivo or todas_dev.empty:
         return pd.DataFrame()

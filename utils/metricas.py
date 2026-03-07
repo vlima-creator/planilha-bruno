@@ -174,7 +174,9 @@ def calcular_qualidade_arquivo(data):
             'sem_sku_pct': (df['SKU'].isna().sum() / total * 100) if 'SKU' in df.columns else 100,
             'sem_data_pct': (df['Data da venda'].isna().sum() / total * 100) if 'Data da venda' in df.columns else 100,
             'sem_numero_venda_pct': (df['N.º de venda'].isna().sum() / total * 100) if 'N.º de venda' in df.columns else 100,
-            'sem_motivo_pct': (df['Motivo'].isna().sum() / total * 100) if 'Motivo' in df.columns else 0,
+            'sem_motivo_pct': (df['Motivo'].isna().sum() / total * 100) if 'Motivo' in df.columns else (
+                (df['Motivo do resultado'].isna().sum() / total * 100) if 'Motivo do resultado' in df.columns else 0
+            ),
             'sem_estado_pct': (df['Estado'].isna().sum() / total * 100) if 'Estado' in df.columns else 0
         }
 
