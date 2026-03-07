@@ -57,10 +57,6 @@ def detectar_plataforma(df):
 def ler_vendas(file):
     """Lê arquivo de Vendas (ML ou Shopee)"""
     try:
-        # Tentar ler para detectar plataforma
-        # Para Shopee .all, a aba é 'orders'
-        # Para ML, a aba é 'Vendas BR' e começa na linha 6
-        
         xls = pd.ExcelFile(file)
         plataforma = 'ML'
         header_row = 5
@@ -75,7 +71,6 @@ def ler_vendas(file):
             header_row = 5
             sheet_name = 'Vendas BR'
         else:
-            # Tentar ler a primeira aba
             sheet_name = xls.sheet_names[0]
             test_df = pd.read_excel(file, sheet_name=sheet_name, nrows=10)
             plataforma = detectar_plataforma(test_df)
@@ -89,27 +84,17 @@ def ler_vendas(file):
         df.columns = [col.strip() if isinstance(col, str) else col for col in df.columns]
 
         if plataforma == 'Shopee':
-            # Mapear colunas Shopee para o padrão do App (ou manter originais e tratar nas métricas)
-            # Para manter a lógica do app, vamos criar colunas equivalentes onde possível
             df['Data da venda'] = pd.to_datetime(df['Data de criação do pedido'], errors='coerce')
             df['N.º de venda'] = df['ID do pedido'].astype(str)
             df['SKU'] = df['Número de referência SKU'].fillna(df['Nº de referência do SKU principal'])
             df['Título do anúncio'] = df['Nome do Produto']
             df['Unidades'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(1)
-            
-            # Valores financeiros Shopee
             df['Receita por produtos (BRL)'] = df['Subtotal do produto'].apply(limpar_valor_shopee)
             df['Receita por envio (BRL)'] = df['Taxa de envio pagas pelo comprador'].apply(limpar_valor_shopee)
-            
-            # Venda por publicidade na Shopee? (Não tem essa info direta no Order.all)
             df['Venda por publicidade'] = 'Não'
-            
-            # Status do Pedido Shopee
             if 'Status do pedido' in df.columns:
                 df['Estado'] = df['Status do pedido']
             
-            # Canal na Shopee (Padrão)
-            # Formato solicitado: (Método de envio + Opção de envio)
             if 'Método de envio' in df.columns and 'Opção de envio' in df.columns:
                 df['Forma de entrega'] = df.apply(
                     lambda x: f"{x['Método de envio']} ({x['Opção de envio']})" 
@@ -118,12 +103,24 @@ def ler_vendas(file):
                     axis=1
                 )
             else:
-                df['Forma de entrega'] = df['Método de envio']
+                df['Forma de entrega'] = df.get('Método de envio', 'Não informado')
             
         else: # ML
             if 'Data da venda' in df.columns:
                 df['Data da venda'] = df['Data da venda'].apply(parse_date_pt_br)
             
+            # Tratar Forma de entrega em branco
+            if 'Forma de entrega' in df.columns:
+                df['Forma de entrega'] = df['Forma de entrega'].fillna('Não informado').replace('', 'Não informado').replace(' ', 'Não informado')
+            else:
+                df['Forma de entrega'] = 'Não informado'
+
+            # Identificar Cancelamentos ML
+            if 'Estado' in df.columns:
+                df['is_cancelado'] = df['Estado'].astype(str).str.lower().str.contains('cancelada', na=False)
+            else:
+                df['is_cancelado'] = False
+
             # Converter números ML
             for col in df.columns:
                 if isinstance(col, str) and ('BRL' in col or 'Receita' in col or 'Custo' in col or 'Taxa' in col):
@@ -139,8 +136,6 @@ def ler_devolucoes(file):
     """Lê arquivo de Devoluções (ML ou Shopee)"""
     try:
         xls = pd.ExcelFile(file)
-        
-        # Detectar se é Shopee (geralmente tem ID da Devolução)
         is_shopee = False
         if 'Sheet1' in xls.sheet_names:
             test_df = pd.read_excel(file, sheet_name='Sheet1', nrows=5)
@@ -151,52 +146,14 @@ def ler_devolucoes(file):
             df = pd.read_excel(file, sheet_name='Sheet1')
             df = df.dropna(how='all')
             df.columns = [col.strip() if isinstance(col, str) else col for col in df.columns]
-            
-            # Mapear para o padrão
             df['N.º de venda'] = df['ID do pedido'].astype(str)
-            if 'ID da Devolução' in df.columns:
-                df['ID_Devolucao'] = df['ID da Devolução'].astype(str)
-            
             df['Data da venda'] = pd.to_datetime(df['Data de criação do pedido'], errors='coerce')
             df['Estado'] = df['Status da Devolução / Reembolso']
             df['Motivo do resultado'] = df['Motivo da Devolução']
-            
-            # Identificar se é um reembolso concluído ou em processo
             df['is_reembolso'] = df['Estado'].astype(str).str.lower().str.contains('reembolso|concluído|aceito|aprovad', na=False)
-            
-            # Tentar capturar forma de entrega se disponível no relatório de devoluções
-            if 'Método de envio' in df.columns and 'Opção de envio' in df.columns:
-                df['Forma de entrega'] = df.apply(
-                    lambda x: f"{x['Método de envio']} ({x['Opção de envio']})" 
-                    if pd.notna(x['Método de envio']) and pd.notna(x['Opção de envio']) 
-                    else (x['Método de envio'] if pd.notna(x['Método de envio']) else x['Opção de envio']), 
-                    axis=1
-                )
-            elif 'Método de envio' in df.columns:
-                df['Forma de entrega'] = df['Método de envio']
-            
-            # Valores financeiros Shopee
-            # 'Quantia total de reembolsos' = valor reembolsado ao comprador (impacto bruto)
             df['Cancelamentos e reembolsos (BRL)'] = df['Quantia total de reembolsos'].apply(limpar_valor_shopee)
-            
-            # CORREÇÃO: Mapear por nome de coluna, não por índice
-            # 'Renda do pedido' = valor que o vendedor recebeu do pedido original
-            # 'Valor de compensação' = compensação paga pela Shopee ao vendedor
-            if 'Renda do pedido' in df.columns:
-                df['Shopee_Col_O'] = df['Renda do pedido'].apply(limpar_valor_shopee)
-            else:
-                df['Shopee_Col_O'] = 0.0
-                
-            if 'Valor de compensação' in df.columns:
-                df['Shopee_Col_R'] = df['Valor de compensação'].apply(limpar_valor_shopee)
-            else:
-                df['Shopee_Col_R'] = 0.0
-                
-            df['Tarifas de envio (BRL)'] = 0.0
-            df['Tarifa de venda e impostos (BRL)'] = 0.0
-            
             df['Plataforma'] = 'Shopee'
-            return df, None # Retorna como 'matriz', 'full' como None
+            return df, None
             
         else: # ML
             matriz = None
@@ -210,12 +167,10 @@ def ler_devolucoes(file):
                 if 'Data da venda' in df.columns:
                     df['Data da venda'] = df['Data da venda'].apply(parse_date_pt_br)
                 
-                # Converter valores numéricos para float, especialmente 'Cancelamentos e reembolsos (BRL)'
                 for col in df.columns:
                     if isinstance(col, str) and ('BRL' in col or 'Receita' in col or 'Custo' in col or 'Taxa' in col):
                         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
                 
-                # Garantir que 'Cancelamentos e reembolsos (BRL)' é positivo (converter de negativo se necessário)
                 if 'Cancelamentos e reembolsos (BRL)' in df.columns:
                     df['Cancelamentos e reembolsos (BRL)'] = df['Cancelamentos e reembolsos (BRL)'].abs()
                 
@@ -235,7 +190,6 @@ def processar_arquivos(file_vendas, file_devolucoes):
     vendas = ler_vendas(file_vendas)
     matriz, full = ler_devolucoes(file_devolucoes)
     
-    # Data máxima
     if 'Data da venda' in vendas.columns:
         max_date = vendas['Data da venda'].max()
         if pd.isna(max_date):

@@ -22,31 +22,6 @@ def preparar_dados_analise(vendas, matriz, full):
             
     return vendas_periodo, todas_dev
 
-def _agrupar_vendas_por_pedido(vendas_periodo):
-    """
-    Para Shopee: agrupa linhas por pedido único para evitar duplicatas por múltiplos itens.
-    Para ML: retorna o DataFrame original.
-    """
-    plataforma = vendas_periodo['Plataforma'].iloc[0] if not vendas_periodo.empty and 'Plataforma' in vendas_periodo.columns else 'ML'
-    
-    if plataforma == 'Shopee' and 'N.º de pedido' in vendas_periodo.columns:
-        # Renomear para padronizar com ML se necessário
-        if 'N.º de venda' not in vendas_periodo.columns:
-            vendas_periodo['N.º de venda'] = vendas_periodo['N.º de pedido']
-            
-        # Agrupar por pedido
-        res = vendas_periodo.groupby('N.º de venda').agg({
-            'Data': 'first',
-            'Preço unitário (BRL)': 'sum',
-            'Custo de frete a cargo do vendedor (BRL)': 'sum',
-            'Comissão e outras tarifas (BRL)': 'sum',
-            'Plataforma': 'first',
-            'Anúncio': 'first',
-            'SKU': 'first'
-        }).reset_index()
-        return res
-    return vendas_periodo
-
 def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     """Análise de frete e forma de entrega."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
@@ -63,13 +38,20 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     if col_entrega not in vendas_periodo.columns:
         vendas_periodo[col_entrega] = 'Não informado'
     else:
-        vendas_periodo[col_entrega] = vendas_periodo[col_entrega].fillna('Não informado').replace('', 'Não informado')
+        vendas_periodo[col_entrega] = vendas_periodo[col_entrega].fillna('Não informado').replace('', 'Não informado').replace(' ', 'Não informado')
         
     if col_valor_dev not in todas_dev.columns:
         todas_dev[col_valor_dev] = 0.0
         
-    # CORREÇÃO CRÍTICA: Remover duplicatas de devoluções antes do merge para evitar explosão de linhas
-    # e garantir que cada venda conte apenas como 1 devolução se houver no relatório de devoluções
+    # Identificar cancelamentos (vendas que têm status de cancelado no relatório de vendas)
+    if 'is_cancelado' not in vendas_periodo.columns:
+        if 'Estado' in vendas_periodo.columns:
+            vendas_periodo['is_cancelado'] = vendas_periodo['Estado'].astype(str).str.lower().str.contains('cancelada', na=False)
+        else:
+            vendas_periodo['is_cancelado'] = False
+
+    # Devoluções: Vendas que aparecem no relatório de devoluções e NÃO são cancelamentos
+    # Deduplicação de devoluções antes do merge
     todas_dev_unicas = todas_dev.drop_duplicates(subset=['N.º de venda']).copy()
     
     # Cruzar vendas com devoluções únicas
@@ -78,23 +60,24 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     # Identificar coluna de valor após merge
     col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
     
-    # Uma venda é considerada devolução apenas se o valor de reembolso for diferente de zero ou se estiver no relatório
-    df_merged['tem_dev'] = df_merged[col_valor_final].notna() & (df_merged[col_valor_final] != 0)
+    # Uma venda é considerada devolução se estiver no relatório de devoluções E não for cancelada
+    df_merged['no_relatorio_dev'] = df_merged[col_valor_final].notna()
+    df_merged['is_devolucao'] = df_merged['no_relatorio_dev'] & (~df_merged['is_cancelado'])
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     
     # Agrupar por Forma de Entrega
     res = df_merged.groupby(col_entrega).agg(
         Vendas=('N.º de venda', 'count'),
-        Devoluções=('tem_dev', 'sum'),
+        Cancelados=('is_cancelado', 'sum'),
+        Devoluções=('is_devolucao', 'sum'),
         Impacto=('valor_dev', 'sum')
     ).reset_index()
     
     # Renomear coluna de agrupamento para 'Forma de Entrega'
     res = res.rename(columns={col_entrega: 'Forma de Entrega'})
     
-    # Cálculos adicionais
-    res['Cancelados'] = 0 # Placeholder
-    res['Vendas Líquidas'] = res['Vendas'] - res['Devoluções']
+    # Vendas Líquidas = Vendas - Cancelados - Devoluções
+    res['Vendas Líquidas'] = res['Vendas'] - res['Cancelados'] - res['Devoluções']
     res['Taxa (%)'] = (res['Devoluções'] / res['Vendas'] * 100).round(1).fillna(0)
     
     # Renomear para o que o app.py espera na exibição
@@ -139,14 +122,23 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     df_merged = pd.merge(vendas_periodo, todas_dev_unicas[['N.º de venda', col_valor_dev]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     col_valor_final = col_valor_dev if col_valor_dev in df_merged.columns else f"{col_valor_dev}_dev"
     
-    df_merged['tem_dev'] = df_merged[col_valor_final].notna() & (df_merged[col_valor_final] != 0)
+    # Identificar cancelamentos
+    if 'is_cancelado' not in df_merged.columns:
+        if 'Estado' in df_merged.columns:
+            df_merged['is_cancelado'] = df_merged['Estado'].astype(str).str.lower().str.contains('cancelada', na=False)
+        else:
+            df_merged['is_cancelado'] = False
+
+    df_merged['no_relatorio_dev'] = df_merged[col_valor_final].notna()
+    df_merged['is_devolucao'] = df_merged['no_relatorio_dev'] & (~df_merged['is_cancelado'])
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
     df_merged['Tipo'] = df_merged[col_ads].apply(lambda x: 'Com Publicidade' if x == 'Sim' else 'Orgânico')
     
     # Agrupar por Tipo (Ads vs Orgânico)
     res = df_merged.groupby('Tipo').agg(
         Vendas=('N.º de venda', 'count'),
-        Devoluções=('tem_dev', 'sum'),
+        Cancelados=('is_cancelado', 'sum'),
+        Devoluções=('is_devolucao', 'sum'),
         Impacto=('valor_dev', 'sum'),
         Receita=(col_receita, 'sum')
     ).reset_index()
@@ -180,21 +172,28 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     if todas_dev.empty or 'N.º de venda' not in todas_dev.columns:
         return garantir_colunas_app(pd.DataFrame()), 0
     
+    # Identificar cancelamentos no relatório de vendas
+    if 'is_cancelado' not in vendas_periodo.columns:
+        if 'Estado' in vendas_periodo.columns:
+            vendas_periodo['is_cancelado'] = vendas_periodo['Estado'].astype(str).str.lower().str.contains('cancelada', na=False)
+        else:
+            vendas_periodo['is_cancelado'] = False
+
     todas_dev_unicas = todas_dev.drop_duplicates(subset=['N.º de venda']).copy()
-    todas_dev_validas = todas_dev_unicas[todas_dev_unicas[col_valor] != 0].copy()
     
-    df_merged = pd.merge(vendas_periodo, todas_dev_validas[['N.º de venda', col_valor]], on='N.º de venda', how='left', suffixes=('', '_dev'))
+    df_merged = pd.merge(vendas_periodo, todas_dev_unicas[['N.º de venda', col_valor]], on='N.º de venda', how='left', suffixes=('', '_dev'))
     col_valor_final = col_valor if col_valor in df_merged.columns else f"{col_valor}_dev"
     
-    df_merged['tem_dev'] = df_merged[col_valor_final].notna() & (df_merged[col_valor_final] != 0)
+    df_merged['no_relatorio_dev'] = df_merged[col_valor_final].notna()
+    df_merged['is_devolucao'] = df_merged['no_relatorio_dev'] & (~df_merged['is_cancelado'])
     df_merged['valor_dev'] = df_merged[col_valor_final].fillna(0).abs()
-    df_merged['Dev'] = df_merged['tem_dev'].astype(int)
+    df_merged['Dev'] = df_merged['is_devolucao'].astype(int)
     
     if agrupar_por in df_merged.columns:
         res = df_merged.groupby(agrupar_por).agg(
             Vendas=('N.º de venda', 'count'),
             Dev=('Dev', 'sum'),
-            **{'Dev.': ('tem_dev', 'sum')}
+            **{'Dev.': ('is_devolucao', 'sum')}
         ).reset_index()
         
         impacto_por_sku = df_merged.groupby(agrupar_por)['valor_dev'].sum()
