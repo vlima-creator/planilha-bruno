@@ -76,15 +76,13 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     # Renomear coluna de agrupamento para 'Forma de Entrega'
     res = res.rename(columns={col_entrega: 'Forma de Entrega'})
     
-    # Vendas Líquidas = Vendas - Cancelados - Devoluções
-    res['Vendas Líquidas'] = res['Vendas'] - res['Cancelados'] - res['Devoluções']
     res['Taxa (%)'] = (res['Devoluções'] / res['Vendas'] * 100).round(1).fillna(0)
     
     # Renomear para o que o app.py espera na exibição
     res = res.rename(columns={'Impacto': 'Impacto (R$)'})
     
     # Garantir ordem das colunas para o display
-    cols_ordem = ['Forma de Entrega', 'Vendas', 'Cancelados', 'Devoluções', 'Vendas Líquidas', 'Taxa (%)', 'Impacto (R$)']
+    cols_ordem = ['Forma de Entrega', 'Vendas', 'Cancelados', 'Devoluções', 'Taxa (%)', 'Impacto (R$)']
     for col in cols_ordem:
         if col not in res.columns:
             res[col] = 0

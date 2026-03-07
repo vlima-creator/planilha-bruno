@@ -468,9 +468,9 @@ else:
     with tab1:
         metricas = calcular_metricas(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global)
         
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1, c2, c3, c4, c5 = st.columns(5)
         with c1:
-            render_metric_card("VENDAS LÍQUIDAS", formatar_numero(metricas['vendas_liquidas']), f"Bruto: {formatar_numero(metricas['vendas'])}", "🛒")
+            render_metric_card("VENDAS TOTAIS", formatar_numero(metricas['vendas']), "Total de pedidos", "🛒")
         with c2:
             render_metric_card("CANCELADOS", formatar_numero(metricas['vendas_canceladas']), "Vendas não concluídas", "🚫")
         with c3:
@@ -479,8 +479,6 @@ else:
             render_metric_card("FAT. DEVOLUÇÕES", formatar_brl(metricas['faturamento_devolucoes']), "", "📉")
         with c5:
             render_metric_card("PERDA TOTAL", formatar_brl(metricas['perda_total']), "", "⚠️")
-        with c6:
-            render_metric_card("PERDA PARCIAL", formatar_brl(metricas['perda_parcial']), "", "📦")
             
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -742,7 +740,6 @@ else:
             df_frete_display['Vendas'] = df_frete_display['Vendas'].astype(int).apply(lambda x: formatar_numero(x))
             df_frete_display['Cancelados'] = df_frete_display['Cancelados'].astype(int).apply(lambda x: formatar_numero(x))
             df_frete_display['Devoluções'] = df_frete_display['Devoluções'].astype(int).apply(lambda x: formatar_numero(x))
-            df_frete_display['Vendas Líquidas'] = df_frete_display['Vendas Líquidas'].astype(int).apply(lambda x: formatar_numero(x))
             df_frete_display['Taxa (%)'] = df_frete_display['Taxa (%)'].apply(lambda x: formatar_pct_direto(x))
             df_frete_display['Impacto (R$)'] = df_frete_display['Impacto (R$)'].apply(lambda x: formatar_brl(x))
             st.dataframe(df_frete_display, use_container_width=True, hide_index=True)

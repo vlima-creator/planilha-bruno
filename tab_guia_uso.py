@@ -110,56 +110,52 @@ def render_tab_guia_uso():
         - **Significado**: Número de pedidos únicos que foram cancelados e, portanto, não foram concluídos. Estes pedidos não geram faturamento nem são considerados para a taxa de devolução.
         - **Cálculo**: Contagem de IDs de pedidos únicos com status de cancelamento no relatório de vendas.
 
-        ### 3️⃣ Vendas Líquidas
-        - **Significado**: O número de vendas efetivamente realizadas, após subtrair os pedidos cancelados e os pedidos que resultaram em devolução.
-        - **Cálculo**: `Vendas Totais (pedidos únicos) - Vendas Canceladas (pedidos únicos) - Devoluções (pedidos únicos)`
-
-        ### 4️⃣ Unidades Vendidas
+        ### 3️⃣ Unidades Vendidas
         - **Significado**: O total de unidades de produtos vendidas em pedidos não cancelados.
         - **Cálculo**: Soma da coluna 'Unidades' para todos os pedidos não cancelados.
 
-        ### 5️⃣ Faturamento por Produtos
+        ### 4️⃣ Faturamento por Produtos
         - **Significado**: A receita bruta gerada apenas pela venda dos produtos, excluindo o valor do frete.
         - **Cálculo**: Soma da coluna 'Receita por produtos (BRL)' (Mercado Livre) ou 'Subtotal do produto' (Shopee) para todos os pedidos não cancelados.
 
-        ### 6️⃣ Faturamento Total
+        ### 5️⃣ Faturamento Total
         - **Significado**: A receita bruta total, incluindo o valor dos produtos e o valor do frete pago pelo comprador.
         - **Cálculo**: `Faturamento por Produtos + Receita por Envio`
 
-        ### 7️⃣ Devoluções
+        ### 6️⃣ Devoluções
         - **Significado**: O número de pedidos únicos que tiveram algum tipo de devolução ou reembolso processado no período.
         - **Cálculo**: Contagem de IDs de pedidos únicos presentes no relatório de devoluções que também estão no relatório de vendas do período.
 
-        ### 8️⃣ Taxa de Devolução (%)
+        ### 7️⃣ Taxa de Devolução (%)
         - **Significado**: O percentual de vendas efetivamente enviadas que resultaram em uma devolução. É um indicador chave da qualidade do produto, anúncio ou processo logístico.
         - **Cálculo**: `(Devoluções (pedidos únicos) / (Vendas Totais (pedidos únicos) - Vendas Canceladas (pedidos únicos))) × 100`
 
-        ### 9️⃣ Faturamento de Devoluções
+        ### 8️⃣ Faturamento de Devoluções
         - **Significado**: O valor total dos produtos que foram devolvidos e reembolsados aos compradores.
         - **Cálculo**: Soma da coluna 'Cancelamentos e reembolsos (BRL)' (Mercado Livre) ou 'Quantia total de reembolsos' (Shopee) para todas as devoluções únicas.
 
-        ### 🔟 Impacto de Devolução
+        ### 9️⃣ Impacto de Devolução
         - **Significado**: O valor financeiro total que representa o reembolso pago ao comprador devido às devoluções. Este valor é o que o vendedor "perde" diretamente com o estorno.
         - **Cálculo**: Soma da coluna 'Cancelamentos e reembolsos (BRL)' (Mercado Livre) ou 'Quantia total de reembolsos' (Shopee) para todas as devoluções únicas.
 
-        ### 1️⃣1️⃣ Perda Parcial
+        ### 🔟 Perda Parcial
         - **Significado**: Representa os custos que o vendedor não consegue recuperar em uma devolução, mesmo que o produto retorne ao estoque ou haja compensação. Inclui taxas de envio não reembolsáveis, tarifas de venda e, para Shopee, a diferença entre o reembolso e o que o vendedor recebeu/compensação.
         - **Cálculo (Mercado Livre)**: `Soma das tarifas de envio não recuperadas + Soma das tarifas de venda e impostos não recuperadas`
         - **Cálculo (Shopee)**: `Soma de (Quantia total de reembolsos - Renda do pedido - Valor de compensação)` para cada devolução única, considerando apenas valores positivos.
 
-        ### 1️⃣2️⃣ Perda Total
+        ### 1️⃣1️⃣ Perda Total
         - **Significado**: O custo total de uma devolução para o vendedor. Inclui a perda do valor do produto (se não recuperado) mais a perda parcial (custos não recuperáveis).
         - **Cálculo**: Se a devolução é classificada como 'Crítica' (produto perdido), `Perda Total = Impacto de Devolução + Perda Parcial`. Se 'Saudável' (produto recuperado), `Perda Total = Perda Parcial`.
 
-        ### 1️⃣3️⃣ Devoluções Saudáveis
+        ### 1️⃣2️⃣ Devoluções Saudáveis
         - **Significado**: Número de devoluções onde o produto foi recuperado ou o processo foi concluído sem maiores problemas para o vendedor (ex: produto voltou ao estoque).
         - **Cálculo**: Contagem de devoluções únicas classificadas como 'Saudável' com base no status da devolução.
 
-        ### 1️⃣4️⃣ Devoluções Críticas
+        ### 1️⃣3️⃣ Devoluções Críticas
         - **Significado**: Número de devoluções problemáticas, onde o produto foi perdido, danificado ou o processo resultou em uma disputa desfavorável ao vendedor.
         - **Cálculo**: Contagem de devoluções únicas classificadas como 'Crítica' com base no status da devolução.
 
-        ### 1️⃣5️⃣ Devoluções Neutras
+        ### 1️⃣4️⃣ Devoluções Neutras
         - **Significado**: Número de devoluções que estão em processo ou cujo status não permite uma classificação clara como 'Saudável' ou 'Crítica'.
         - **Cálculo**: Contagem de devoluções únicas classificadas como 'Neutra' com base no status da devolução.
 

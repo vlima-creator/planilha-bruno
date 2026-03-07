@@ -131,7 +131,6 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                 
     devolucoes_count = len(venda_com_devolucao)
     vendas_enviadas = vendas_totais - vendas_canceladas_count
-    vendas_liquidas = vendas_enviadas - devolucoes_count
     taxa_devolucao = devolucoes_count / vendas_enviadas if vendas_enviadas > 0 else 0
     
     unidades_totais = int(vendas_periodo[~vendas_periodo['is_cancelado']]['Unidades'].fillna(0).sum()) if 'Unidades' in vendas_periodo.columns else (vendas_totais - vendas_canceladas_count)
@@ -139,7 +138,6 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
     return {
         'vendas': vendas_totais,
         'vendas_canceladas': vendas_canceladas_count,
-        'vendas_liquidas': vendas_liquidas,
         'unidades': unidades_totais,
         'faturamento_produtos': faturamento_produtos,
         'faturamento_total': faturamento_total,
