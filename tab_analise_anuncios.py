@@ -147,7 +147,10 @@ Um checklist de até 10 itens no formato [ ] ação com os pontos cruciais para 
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Dicas de uso
-    with st.expander("💡 Dicas de Uso"):
+    # Ícone Lightbulb
+    icon_light = st.session_state.get('render_icon_svg', lambda x, **kwargs: "")("lightbulb", color="#ffffff")
+    with st.expander("Dicas de Uso"):
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">{icon_light} <h3 style="margin: 0;">Sugestões</h3></div>', unsafe_allow_html=True)
         st.markdown("""
         - **Link:** Funciona com anúncios do Mercado Livre, Amazon e outras plataformas
         - **Prompt:** O prompt padrão (V.2.0) está otimizado para análise profunda de anúncios do Mercado Livre

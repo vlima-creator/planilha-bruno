@@ -9,7 +9,10 @@ def render_tab_guia_uso():
     # ─────────────────────────────────────────────────────────
     # SEÇÃO 1: COMO COMEÇAR
     # ─────────────────────────────────────────────────────────
-    with st.expander("🚀 Como Começar - Passo a Passo", expanded=False):
+    # Ícone Rocket
+    icon_rocket = st.session_state.get('render_icon_svg', lambda x, **kwargs: "")("rocket", color="#ffffff")
+    with st.expander("Como Começar - Passo a Passo", expanded=False):
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">{icon_rocket} <h3 style="margin: 0;">Início Rápido</h3></div>', unsafe_allow_html=True)
         st.markdown("""
         ### Passo 1️⃣: Baixar os Relatórios
 
@@ -39,10 +42,10 @@ def render_tab_guia_uso():
 
         ### Passo 2️⃣: Fazer Upload dos Arquivos
 
-        1. Na **Sidebar** (esquerda), clique em **"📁 Upload de Dados"**
+        1. Na **Sidebar** (esquerda), clique em **"Arquivos"**
         2. Selecione o arquivo de **Vendas** (ou Pedidos da Shopee)
         3. Selecione o arquivo de **Devoluções** (ou Devoluções/Reembolsos da Shopee)
-        4. Clique no botão **"🚀 Processar"**
+        4. Clique no botão **"Processar"**
         5. Aguarde o processamento (pode levar alguns segundos)
 
         ### Passo 3️⃣: Explorar os Dados
@@ -56,7 +59,10 @@ def render_tab_guia_uso():
     # ─────────────────────────────────────────────────────────
     # SEÇÃO 2: LOCALIZANDO OS RELATÓRIOS
     # ─────────────────────────────────────────────────────────
-    with st.expander("🔍 Localizando os Relatórios", expanded=False):
+    # Ícone Search
+    icon_search = st.session_state.get('render_icon_svg', lambda x, **kwargs: "")("search", color="#ffffff")
+    with st.expander("Localizando os Relatórios", expanded=False):
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">{icon_search} <h3 style="margin: 0;">Onde encontrar os arquivos</h3></div>', unsafe_allow_html=True)
         st.markdown("""
         ### 📍 Localização Exata dos Relatórios
 
@@ -90,7 +96,7 @@ def render_tab_guia_uso():
         - **Colunas**: Mantenha as colunas padrão da plataforma
         - **Idioma**: Português (BR)
 
-        ### 💡 Dica Importante
+        ### Dica Importante
 
         > Para análises mais precisas, recomendamos usar dados de **pelo menos 30 dias** de histórico. Isso garante uma quantidade significativa de devoluções para identificar padrões.
         """)
@@ -98,7 +104,10 @@ def render_tab_guia_uso():
     # ─────────────────────────────────────────────────────────
     # SEÇÃO 3: EXPLICAÇÃO DOS CÁLCULOS E MÉTRICAS
     # ─────────────────────────────────────────────────────────
-    with st.expander("📐 Explicação dos Cálculos e Métricas", expanded=False):
+    # Ícone Rule
+    icon_rule = st.session_state.get('render_icon_svg', lambda x, **kwargs: "")("rule", color="#ffffff")
+    with st.expander("Explicação dos Cálculos e Métricas", expanded=False):
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">{icon_rule} <h3 style="margin: 0;">Metodologia</h3></div>', unsafe_allow_html=True)
         st.markdown("""
         Esta seção detalha o significado e a forma de cálculo de cada indicador apresentado no dashboard, garantindo total transparência e compreensão dos dados.
 
@@ -173,7 +182,10 @@ def render_tab_guia_uso():
     # ─────────────────────────────────────────────────────────
     # SEÇÃO 4: DICAS E BOAS PRÁTICAS
     # ─────────────────────────────────────────────────────────
-    with st.expander("💡 Dicas e Boas Práticas", expanded=False):
+    # Ícone Lightbulb
+    icon_light = st.session_state.get('render_icon_svg', lambda x, **kwargs: "")("lightbulb", color="#ffffff")
+    with st.expander("Dicas e Boas Práticas", expanded=False):
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">{icon_light} <h3 style="margin: 0;">Sugestões</h3></div>', unsafe_allow_html=True)
         st.markdown("""
         ### ✅ Boas Práticas para Reduzir Devoluções
 
