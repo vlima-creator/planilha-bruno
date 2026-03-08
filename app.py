@@ -826,7 +826,7 @@ else:
     # ─── TAB 4: FRETE ───
     with tab4:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.markdown('<div class="chart-title">🚚 Análise de Frete e Forma de Entrega</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">Análise de Frete e Forma de Entrega</div>', unsafe_allow_html=True)
         df_frete = analisar_frete(data['vendas'], data['matriz'], data['full'], data['max_date'], janela_global)
         if len(df_frete) > 0:
             df_frete_display = df_frete.copy()
@@ -844,7 +844,7 @@ else:
     # ─── TAB 5: MOTIVOS ───
     with tab5:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.markdown('<div class="chart-title">🔍 Filtros de Devolução</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">Filtros de Devolução</div>', unsafe_allow_html=True)
         
         col_s1, col_s2, col_s3 = st.columns(3)
         with col_s1:
@@ -931,15 +931,15 @@ else:
         
         c1, c2, c3, c4, c5 = st.columns(5)
         with c1:
-            render_metric_card("VENDAS ADS", formatar_numero(ads_vendas), "", "📣")
+            render_metric_card("VENDAS ADS", formatar_numero(ads_vendas), "", "ads")
         with c2:
-            render_metric_card("DEV. ADS", formatar_numero(ads_dev), "", "📉")
+            render_metric_card("DEV. ADS", formatar_numero(ads_dev), "", "motivos")
         with c3:
-            render_metric_card("TAXA ADS", formatar_pct_direto(ads_taxa), "", "🎯")
+            render_metric_card("TAXA ADS", formatar_pct_direto(ads_taxa), "", "ia")
         with c4:
-            render_metric_card("IMPACTO ADS", formatar_brl(ads_impacto), "", "📉")
+            render_metric_card("IMPACTO ADS", formatar_brl(ads_impacto), "", "faturamento")
         with c5:
-            render_metric_card("FAT. ADS", formatar_brl(ads_fat), "", "💲")
+            render_metric_card("FAT. ADS", formatar_brl(ads_fat), "", "faturamento")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -1084,11 +1084,11 @@ else:
         
         c1, c2, c3 = st.columns(3)
         with c1:
-            render_metric_card("DEVOLUCOES SIMULADAS", formatar_numero(dev_evitadas), f"Antes: {formatar_numero(int(total_dev))}", "📦")
+            render_metric_card("DEVOLUÇÕES SIMULADAS", formatar_numero(dev_evitadas), f"Antes: {formatar_numero(int(total_dev))}", "devolucoes")
         with c2:
-            render_metric_card("PERDA SIMULADA", formatar_brl(dinheiro_recuperado), f"Antes: {formatar_brl(impacto_total)}", "💰")
+            render_metric_card("PERDA SIMULADA", formatar_brl(dinheiro_recuperado), f"Antes: {formatar_brl(impacto_total)}", "faturamento")
         with c3:
-            render_metric_card("ECONOMIA ESTIMADA", formatar_brl(dinheiro_recuperado), "Reducao de perda", "📈")
+            render_metric_card("ECONOMIA ESTIMADA", formatar_brl(dinheiro_recuperado), "Redução de perda", "ia")
     
     # ─── TAB 9: IA ANÁLISE DE ANÚNCIOS ───
     with tab9:
@@ -1096,11 +1096,11 @@ else:
     
     # ─── EXPORT ───
     st.markdown("---")
-    if st.button("📥 Exportar Relatório XLSX", use_container_width=True, type="primary"):
+    if st.button("Exportar Relatório XLSX", use_container_width=True, type="primary"):
         try:
             xlsx_file = exportar_xlsx(data)
             st.download_button(
-                label="⬇️ Clique aqui para baixar",
+                label="Clique aqui para baixar",
                 data=xlsx_file,
                 file_name=f"Relatorio_Vendas_Devolucoes_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
