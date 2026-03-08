@@ -24,13 +24,13 @@ class PDFRelatorioAnuncio(FPDF):
         self.rect(0, 0, 210, 35, 'F')
         
         # Título principal
-        self.set_font("Helvetica", "B", 24)
+        self.set_font("Arial", "B", 24)
         self.set_text_color(255, 255, 255)
         self.set_xy(18, 8)
         self.cell(0, 12, "Relatorio de Analise", ln=True)
         
         # Subtítulo
-        self.set_font("Helvetica", "", 10)
+        self.set_font("Arial", "", 10)
         self.set_text_color(200, 220, 240)
         self.set_xy(18, 22)
         self.cell(0, 8, "Analise Inteligente de Anuncios com IA", ln=True)
@@ -42,7 +42,7 @@ class PDFRelatorioAnuncio(FPDF):
     def footer(self):
         """Rodapé do PDF"""
         self.set_y(-18)
-        self.set_font("Helvetica", "", 8)
+        self.set_font("Arial", "", 8)
         self.set_text_color(128, 128, 128)
         
         # Linha separadora
@@ -62,7 +62,7 @@ class PDFRelatorioAnuncio(FPDF):
         self.rect(18, self.get_y(), 174, 10, 'F')
         
         # Número da seção com círculo
-        self.set_font("Helvetica", "B", 11)
+        self.set_font("Arial", "B", 11)
         self.set_text_color(31, 78, 120)
         self.set_xy(20, self.get_y() + 1)
         self.cell(0, 8, f"{numero}. {titulo}", ln=True)
@@ -71,7 +71,7 @@ class PDFRelatorioAnuncio(FPDF):
 
     def subsection(self, titulo: str):
         """Cria um subtítulo de subsseção"""
-        self.set_font("Helvetica", "B", 10)
+        self.set_font("Arial", "B", 10)
         self.set_text_color(50, 100, 150)
         self.ln(1)
         self.cell(0, 6, f"► {titulo}", ln=True)
@@ -80,11 +80,11 @@ class PDFRelatorioAnuncio(FPDF):
 
     def info_box(self, label: str, value: str):
         """Cria uma caixa de informação estilizada"""
-        self.set_font("Helvetica", "B", 9)
+        self.set_font("Arial", "B", 9)
         self.set_text_color(31, 78, 120)
         self.cell(40, 5, f"{label}:", ln=False)
         
-        self.set_font("Helvetica", "", 9)
+        self.set_font("Arial", "", 9)
         self.set_text_color(0, 0, 0)
         
         # Quebrar valor se muito longo
@@ -102,7 +102,7 @@ class PDFRelatorioAnuncio(FPDF):
 
     def highlight_text(self, texto: str, tipo: str = "normal"):
         """Renderiza texto com destaque baseado no tipo"""
-        self.set_font("Helvetica", "", 9)
+        self.set_font("Arial", "", 9)
         
         if tipo == "lista":
             self.set_text_color(60, 60, 60)
@@ -129,7 +129,13 @@ def limpar_texto_pdf(texto: str) -> str:
     texto = texto.replace('**', '').replace('##', '').replace('###', '')
     texto = texto.replace('`', '').replace('*', '')
     
+    # Remover caracteres especiais problemáticos que causam erro de encoding
+    caracteres_problema = ['–', '—', '…', '"', '"', ''', ''', '•']
+    for char in caracteres_problema:
+        texto = texto.replace(char, '')
+    
     try:
+        # Usar latin-1 que é suportado pela fonte Arial do FPDF
         return texto.encode('latin-1', 'ignore').decode('latin-1')
     except:
         return texto.encode('ascii', 'ignore').decode('ascii')
@@ -172,11 +178,11 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     
     if dados_anuncio.get('descricao'):
         pdf.ln(2)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font("Arial", "B", 9)
         pdf.set_text_color(31, 78, 120)
         pdf.cell(0, 5, "Descricao Resumida:", ln=True)
         
-        pdf.set_font("Helvetica", "", 8)
+        pdf.set_font("Arial", "", 8)
         pdf.set_text_color(60, 60, 60)
         desc = limpar_texto_pdf(str(dados_anuncio.get('descricao')))[:250]
         linhas_desc = quebrar_texto(desc, 75)
@@ -205,7 +211,7 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         if linha.startswith('##') and not linha.startswith('###'):
             numero_secao += 1
             pdf.ln(2)
-            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_font("Arial", "B", 10)
             pdf.set_text_color(31, 78, 120)
             pdf.set_fill_color(240, 245, 250)
             pdf.rect(18, pdf.get_y(), 174, 8, 'F')
@@ -214,16 +220,16 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         
         # Detectar subtítulos (###)
         elif linha.startswith('###'):
-            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_font("Arial", "B", 9)
             pdf.set_text_color(50, 100, 150)
             pdf.ln(1)
-            pdf.cell(0, 6, f"  ► {linha_limpa}", ln=True)
+            pdf.cell(0, 6, f"  > {linha_limpa}", ln=True)
             pdf.set_text_color(0, 0, 0)
             pdf.ln(0.5)
         
         # Detectar listas numeradas (1., 2., etc)
         elif linha_limpa and linha_limpa[0].isdigit() and '.' in linha_limpa[:3]:
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font("Arial", "", 8)
             pdf.set_text_color(60, 60, 60)
             linhas_quebradas = quebrar_texto(linha_limpa, 75)
             for i, linha_quebrada in enumerate(linhas_quebradas):
@@ -235,19 +241,19 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         
         # Detectar listas com hífen ou asterisco
         elif linha_limpa.startswith('-') or linha_limpa.startswith('*'):
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font("Arial", "", 8)
             pdf.set_text_color(60, 60, 60)
             linhas_quebradas = quebrar_texto(linha_limpa.lstrip('-*').strip(), 72)
             for i, linha_quebrada in enumerate(linhas_quebradas):
                 if i == 0:
-                    pdf.cell(0, 5, f"  • {linha_quebrada}", ln=True)
+                    pdf.cell(0, 5, f"  - {linha_quebrada}", ln=True)
                 else:
                     pdf.cell(0, 5, f"     {linha_quebrada}", ln=True)
             pdf.ln(0.5)
         
         # Texto normal
         else:
-            pdf.set_font("Helvetica", "", 8)
+            pdf.set_font("Arial", "", 8)
             pdf.set_text_color(0, 0, 0)
             linhas_quebradas = quebrar_texto(linha_limpa, 75)
             for linha_quebrada in linhas_quebradas:
@@ -256,7 +262,7 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     
     # ========== RODAPÉ FINAL ==========
     pdf.ln(8)
-    pdf.set_font("Helvetica", "I", 7)
+    pdf.set_font("Arial", "I", 7)
     pdf.set_text_color(128, 128, 128)
     
     rodape = "Este relatorio foi gerado automaticamente pela ferramenta de Analise Inteligente de Anuncios. As recomendacoes devem ser validadas conforme o contexto especifico do seu negocio."
