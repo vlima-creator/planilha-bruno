@@ -10,7 +10,7 @@ def render_tab_analise_anuncios():
     st.markdown('<div class="chart-title">Análise Inteligente de Anúncios com IA</div>', unsafe_allow_html=True)
     
     # Seção de configuração
-    st.markdown("### ⚙️ Configuração")
+    st.markdown("### Configuração")
     
     url_anuncio = st.text_input(
         "Cole o link do anúncio (Mercado Livre ou similar)",
@@ -78,13 +78,13 @@ Um checklist de até 10 itens no formato [ ] ação com os pontos cruciais para 
         prompt_usuario = st.session_state.get('prompt_usuario_input', prompt_padrao)
     
     # Botão de análise
-    st.markdown("### 🚀 Executar Análise")
+    st.markdown("### Executar Análise")
     
     col1, col2 = st.columns([2, 1])
     with col1:
-        btn_analisar = st.button("🔍 Analisar Anúncio", use_container_width=True, type="primary")
+        btn_analisar = st.button("Analisar Anúncio", use_container_width=True, type="primary")
     with col2:
-        btn_limpar = st.button("🗑️ Limpar", use_container_width=True)
+        btn_limpar = st.button("Limpar", use_container_width=True)
     
     if btn_limpar:
         st.rerun()
@@ -106,7 +106,7 @@ Um checklist de até 10 itens no formato [ ] ação com os pontos cruciais para 
                     else:
                         # Exibir análise da IA em um container destacado
                         st.markdown("---")
-                        st.markdown("### 🤖 Análise da IA")
+                        st.markdown("### Análise da IA")
                         
                         with st.container(border=True):
                             st.markdown(resultado['analise_ia'])

@@ -78,11 +78,25 @@ st.markdown("""
         right: 20px;
         top: 50%;
         transform: translateY(-50%);
-        font-size: 2rem;
-        color: #a0a0a0;
-        opacity: 0.5;
     }
     
+    .icon-container {
+        width: 45px;
+        height: 45px;
+        background-color: #000000;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .icon-svg {
+        width: 24px;
+        height: 24px;
+        fill: #ffffff;
+    }
+
     /* Estilo das Seções de Gráficos (Glass Effect) */
     .chart-container {
         background-color: rgba(255, 255, 255, 0.03);
@@ -236,13 +250,44 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def render_metric_card(label, value, subvalue, icon):
+def render_icon_svg(icon_name, color="#ffffff"):
+    # Dicionário de caminhos SVG para os ícones
+    icons = {
+        "vendas": '<path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>',
+        "cancelados": '<path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>',
+        "devolucoes": '<path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>',
+        "faturamento": '<path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>',
+        "perda_parcial": '<path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-5 10H9v-2h6v2zm0-4H9v-2h6v2z"/>',
+        "perda_total": '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
+        "guia": '<path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 4h2v5l-1-.75L9 9V4zm9 16H6V4h1v9l3-2.25L13 13V4h5v16z"/>',
+        "resumo": '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>',
+        "janelas": '<path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>',
+        "matriz_full": '<path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H9v-2h6v2zm0-4H9v-2h6v2z"/>',
+        "frete": '<path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>',
+        "motivos": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>',
+        "ads": '<path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 16H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V8h12v2z"/>',
+        "anuncios": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z"/>',
+        "simulador": '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>',
+        "ia": '<path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.51-9.11 0-12.58s9.21-3.47 12.72 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.75 1.23-4.25-2.5V8h1.5z"/>',
+        "config": '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>'
+    }
+    path = icons.get(icon_name, "")
+    return f"""
+        <div class="icon-container">
+            <svg class="icon-svg" viewBox="0 0 24 24" style="fill: {color};">
+                {path}
+            </svg>
+        </div>
+    """
+
+def render_metric_card(label, value, subvalue, icon_name):
+    icon_html = render_icon_svg(icon_name)
     st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">{label}</div>
             <div class="metric-value">{value}</div>
             <div class="metric-subvalue">{subvalue}</div>
-            <div class="metric-icon">{icon}</div>
+            <div class="metric-icon">{icon_html}</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -320,18 +365,21 @@ if 'processed_data' not in st.session_state:
 # SIDEBAR - UPLOAD E CONFIGURAÇÕES
 # ─────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("🚀 Gestão de Devolução Inteligente")
+    st.title("Gestão de Devolução Inteligente")
     st.markdown("---")
     
-    st.subheader("📁 Upload de Dados")
+    # Ícone para Upload de Dados
+    icon_upload = render_icon_svg("guia", color="#ffffff").replace("\n", "")
+    st.markdown(f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">{icon_upload} <h3 style="margin: 0; font-size: 1.2rem;">Upload de Dados</h3></div>', unsafe_allow_html=True)
+    
     file_vendas = st.file_uploader("Relatório de Vendas", type=['xlsx'], key='vendas', help="Arraste o arquivo .xlsx de vendas (ML ou Shopee)")
     file_devolucoes = st.file_uploader("Relatório de Devoluções", type=['xlsx', 'xls'], key='devolucoes', help="Arraste o arquivo de devoluções (ML ou Shopee)")
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        btn_processar = st.button("🚀 Processar", use_container_width=True, type="primary")
+        btn_processar = st.button("Processar", use_container_width=True, type="primary")
     with col_btn2:
-        btn_exemplo = st.button("📋 Exemplo", use_container_width=True)
+        btn_exemplo = st.button("Exemplo", use_container_width=True)
         
     if btn_processar:
         if file_vendas and file_devolucoes:
@@ -367,7 +415,9 @@ with st.sidebar:
         st.success(f"Plataforma Ativa: **{plataforma}**")
         
         st.markdown("---")
-        st.subheader("⚙️ Configurações")
+        # Ícone para Configurações
+        icon_config = render_icon_svg("config", color="#ffffff").replace("\n", "")
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">{icon_config} <h3 style="margin: 0; font-size: 1.2rem;">Configurações</h3></div>', unsafe_allow_html=True)
         visualizacao = st.radio(
             "Visualizar por:",
             ["SKU", "Nome do Produto"],
@@ -377,7 +427,7 @@ with st.sidebar:
         )
         
         st.markdown("---")
-        if st.button("🗑️ Limpar Dados", use_container_width=True):
+        if st.button("Limpar Dados", use_container_width=True):
             st.session_state.processed_data = None
             st.rerun()
 
@@ -389,7 +439,10 @@ if st.session_state.processed_data is None:
     visualizacao = "SKU"
     agrupar_por = "SKU"
     
-    st.title("📊 Dashboard Vendas x Devoluções")
+    # Título com ícone personalizado
+    icon_dash = render_icon_svg("resumo", color="#ffffff").replace("\n", "")
+    st.markdown(f'<div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">{icon_dash} <h1 style="margin: 0;">Dashboard Vendas x Devoluções</h1></div>', unsafe_allow_html=True)
+    
     st.markdown("""
     ### Bem-vindo! 
     Para começar a análise, utilize a **barra lateral à esquerda** para carregar seus relatórios do Mercado Livre.
@@ -418,7 +471,9 @@ else:
     visualizacao = st.session_state.get('config_visualizacao', 'SKU')
     agrupar_por = 'SKU' if visualizacao == "SKU" else 'Título do anúncio'
     
-    st.title("📊 Dashboard de Análise")
+    # Título com ícone personalizado
+    icon_dash = render_icon_svg("resumo", color="#ffffff").replace("\n", "")
+    st.markdown(f'<div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">{icon_dash} <h1 style="margin: 0;">Dashboard de Análise</h1></div>', unsafe_allow_html=True)
     
     # ─────────────────────────────────────────────────────
     # CABEÇALHO GLOBAL DE FILTROS
@@ -455,8 +510,45 @@ else:
     # ─────────────────────────────────────────────────────
     # ABAS
     # ─────────────────────────────────────────────────────
+    # Definir ícones e cores para as abas
+    tab_icons = {
+        "guia": "guia", "resumo": "resumo", "janelas": "janelas", 
+        "matriz_full": "matriz_full", "frete": "frete", "motivos": "motivos", 
+        "ads": "ads", "anuncios": "anuncios", "simulador": "simulador", "ia": "ia"
+    }
+    
+    # Injetar CSS para os ícones das abas
+    tab_styles = ""
+    inactive_color = "#a0a0a0"
+    active_color = "#ffffff"
+    
+    for i, (key, icon) in enumerate(tab_icons.items()):
+        icon_svg_inactive = render_icon_svg(icon, color=inactive_color)
+        icon_svg_active = render_icon_svg(icon, color=active_color)
+        
+        # Escapar as aspas simples para o CSS
+        icon_svg_inactive = icon_svg_inactive.replace("'", '"').replace("\n", "")
+        icon_svg_active = icon_svg_active.replace("'", '"').replace("\n", "")
+        
+        tab_styles += f"""
+        .stTabs [data-baseweb="tab"]:nth-child({i+1})::before {{
+            content: '';
+            display: inline-block;
+            margin-right: 10px;
+            zoom: 0.7;
+        }}
+        .stTabs [data-baseweb="tab"]:nth-child({i+1})::before {{
+            content: url('data:image/svg+xml;utf8,{icon_svg_inactive}');
+        }}
+        .stTabs [data-baseweb="tab"]:nth-child({i+1})[aria-selected="true"]::before {{
+            content: url('data:image/svg+xml;utf8,{icon_svg_active}');
+        }}
+        """
+    
+    st.markdown(f"<style>{tab_styles}</style>", unsafe_allow_html=True)
+
     tab_guia, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-        "📖 Guia de Uso", "Resumo", "Janelas", "Matriz/Full", "Frete", 
+        "Guia de Uso", "Resumo", "Janelas", "Matriz/Full", "Frete", 
         "Motivos", "Ads", "Anúncios", "Simulador", "IA Análise"
     ])
     
@@ -470,17 +562,17 @@ else:
         
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         with c1:
-            render_metric_card("VENDAS TOTAIS", formatar_numero(metricas['vendas']), "Total de pedidos", "🛒")
+            render_metric_card("VENDAS TOTAIS", formatar_numero(metricas['vendas']), "Total de pedidos", "vendas")
         with c2:
-            render_metric_card("CANCELADOS", formatar_numero(metricas['vendas_canceladas']), "Vendas não concluídas", "🚫")
+            render_metric_card("CANCELADOS", formatar_numero(metricas['vendas_canceladas']), "Vendas não concluídas", "cancelados")
         with c3:
-            render_metric_card("DEVOLUÇÕES", formatar_numero(metricas['devolucoes_vendas']), f"Taxa: {formatar_percentual(metricas['taxa_devolucao'])}", "🔄")
+            render_metric_card("DEVOLUÇÕES", formatar_numero(metricas['devolucoes_vendas']), f"Taxa: {formatar_percentual(metricas['taxa_devolucao'])}", "devolucoes")
         with c4:
-            render_metric_card("FAT. DEVOLUÇÕES", formatar_brl(metricas['faturamento_devolucoes']), "", "📉")
+            render_metric_card("FAT. DEVOLUÇÕES", formatar_brl(metricas['faturamento_devolucoes']), "", "faturamento")
         with c5:
-            render_metric_card("PERDA PARCIAL", formatar_brl(metricas['perda_parcial']), "", "📦")
+            render_metric_card("PERDA PARCIAL", formatar_brl(metricas['perda_parcial']), "", "perda_parcial")
         with c6:
-            render_metric_card("PERDA TOTAL", formatar_brl(metricas['perda_total']), "", "⚠️")
+            render_metric_card("PERDA TOTAL", formatar_brl(metricas['perda_total']), "", "perda_total")
             
         st.markdown("<br>", unsafe_allow_html=True)
         
