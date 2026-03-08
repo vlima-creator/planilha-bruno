@@ -944,15 +944,15 @@ else:
         
         c1, c2, c3, c4, c5 = st.columns(5)
         with c1:
-            render_metric_card("VENDAS ADS", formatar_numero(ads_vendas), "", "ads")
+            render_metric_card("VENDAS ADS", formatar_numero(ads_vendas), "Total de pedidos", "ads")
         with c2:
-            render_metric_card("DEV. ADS", formatar_numero(ads_dev), "", "motivos")
+            render_metric_card("DEV. ADS", formatar_numero(ads_dev), "Pedidos devolvidos", "devolucoes")
         with c3:
-            render_metric_card("TAXA ADS", formatar_pct_direto(ads_taxa), "", "ia")
+            render_metric_card("TAXA ADS", formatar_pct_direto(ads_taxa), "Percentual de dev.", "ia")
         with c4:
-            render_metric_card("IMPACTO ADS", formatar_brl(ads_impacto), "", "faturamento")
+            render_metric_card("IMPACTO ADS", formatar_brl(ads_impacto), "Custo de devolução", "faturamento")
         with c5:
-            render_metric_card("FAT. ADS", formatar_brl(ads_fat), "", "faturamento")
+            render_metric_card("FAT. ADS", formatar_brl(ads_fat), "Receita de produtos", "faturamento")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -1012,26 +1012,11 @@ else:
         
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(f"""
-                <div class="metric-card" style="text-align: center;">
-                    <div class="metric-label">Top 10 concentração</div>
-                    <div class="metric-value" style="font-size: 2rem;">{formatar_pct_direto(top10_conc)}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            render_metric_card("TOP 10 CONCENTRAÇÃO", formatar_pct_direto(top10_conc), "Volume de devoluções", "ia")
         with c2:
-            st.markdown(f"""
-                <div class="metric-card" style="text-align: center;">
-                    <div class="metric-label">Top 20 concentração</div>
-                    <div class="metric-value" style="font-size: 2rem;">{formatar_pct_direto(top20_conc)}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            render_metric_card("TOP 20 CONCENTRAÇÃO", formatar_pct_direto(top20_conc), "Volume de devoluções", "ia")
         with c3:
-            st.markdown(f"""
-                <div class="metric-card" style="text-align: center;">
-                    <div class="metric-label">{visualizacao}s com devolução</div>
-                    <div class="metric-value" style="font-size: 2rem;">{total_skus_com_dev}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            render_metric_card(f"{visualizacao.upper()}S COM DEV.", formatar_numero(total_skus_com_dev), "Total no período", "anuncios")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
