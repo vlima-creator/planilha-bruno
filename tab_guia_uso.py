@@ -131,14 +131,14 @@ def render_tab_guia_uso():
         - **Cálculo**: `(Devoluções (pedidos únicos) / (Vendas Totais (pedidos únicos) - Vendas Canceladas (pedidos únicos))) × 100`
 
         ### 8️⃣ Faturamento de Devoluções
-        - **Significado**: O valor total dos produtos que foram devolvidos e reembolsados aos compradores.
+        - **Significado**: O valor total dos produtos que foram devidos e reembolsados aos compradores.
         - **Cálculo**: Soma da coluna 'Cancelamentos e reembolsos (BRL)' (Mercado Livre) ou 'Quantia total de reembolsos' (Shopee) para todas as devoluções únicas.
 
         ### 9️⃣ Impacto de Devolução
         - **Significado**: O valor financeiro total que representa o reembolso pago ao comprador devido às devoluções. Este valor é o que o vendedor "perde" diretamente com o estorno.
         - **Cálculo**: Soma da coluna 'Cancelamentos e reembolsos (BRL)' (Mercado Livre) ou 'Quantia total de reembolsos' (Shopee) para todas as devoluções únicas.
 
-        ### 🔟 Perda Parcial
+        ### 1️⃣0️⃣ Perda Parcial
         - **Significado**: Representa os custos que o vendedor não consegue recuperar em uma devolução, mesmo que o produto retorne ao estoque ou haja compensação. Inclui taxas de envio não reembolsáveis, tarifas de venda e, para Shopee, a diferença entre o reembolso e o que o vendedor recebeu/compensação.
         - **Cálculo (Mercado Livre)**: `Soma das tarifas de envio não recuperadas + Soma das tarifas de venda e impostos não recuperadas`
         - **Cálculo (Shopee)**: `Soma de (Quantia total de reembolsos - Renda do pedido - Valor de compensação)` para cada devolução única, considerando apenas valores positivos.
@@ -230,34 +230,7 @@ def render_tab_guia_uso():
         - ❌ Embalagem inadequada
         """)
 
-    # ─────────────────────────────────────────────────────────
-    # SEÇÃO 5: SUPORTE E TROUBLESHOOTING
-    # ─────────────────────────────────────────────────────────
-    with st.expander("🆘 Suporte e Troubleshooting", expanded=False):
-        st.markdown("""
-        ### ❓ Perguntas Frequentes
-
-        **P: Os arquivos não estão sendo processados**
-        - Verifique se os arquivos estão em formato Excel (.xlsx ou .xls)
-        - Certifique-se de que os nomes das colunas estão em português
-        - Tente fazer download novamente dos relatórios
-
-        **P: Os dados parecem incorretos**
-        - Verifique se o período dos dois relatórios é o mesmo
-        - Confirme que não há filtros aplicados nos relatórios
-        - Tente com um período menor (ex: últimos 7 dias)
-
-        **P: A ferramenta de IA não está funcionando**
-        - Verifique sua conexão com a internet
-        - Tente novamente em alguns minutos
-        - Verifique se a chave de API está configurada
-
-        **P: Posso usar dados de múltiplos períodos?**
-        - Sim, mas combine os arquivos em um único Excel antes
-        - Ou processe um período por vez e compare
-
-        ---
-        **Dica Final:** Esta ferramenta é um complemento à sua análise. Combine os dados aqui com sua experiência de vendedor para tomar as melhores decisões! 🎯
-        """)
+    st.markdown("---")
+    st.markdown("**Dica Final:** Esta ferramenta é um complemento à sua análise. Combine os dados aqui com sua experiência de vendedor para tomar as melhores decisões! 🎯")
     
     st.markdown("</div>", unsafe_allow_html=True)
