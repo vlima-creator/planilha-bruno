@@ -104,15 +104,13 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                     reembolso = 0.0
                 reembolso = abs(float(reembolso))
                 
-                if reembolso == 0:
-                    reembolso = receita_prod
-                
                 faturamento_devolucoes += reembolso
                 
                 # Custos logísticos (ML)
-                tarifas_envio = float(dev.get('Tarifas de envio (BRL)', 0) or 0)
+                # 'Custo de envio com base nas medidas e peso declarados' é o custo do frete pago pelo vendedor na devolução
+                custo_envio_devolucao = float(dev.get('Custo de envio com base nas medidas e peso declarados', 0) or 0)
                 tarifa_venda = float(dev.get('Tarifa de venda e impostos (BRL)', 0) or 0)
-                perda_parcial_item = abs(tarifas_envio) + abs(tarifa_venda)
+                perda_parcial_item = abs(custo_envio_devolucao) + abs(tarifa_venda)
                 
                 classe = classificar_estado(dev.get('Estado'), plataforma)
                 if classe == 'Saudável':

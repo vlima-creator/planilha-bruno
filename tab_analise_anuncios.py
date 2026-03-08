@@ -7,7 +7,7 @@ def render_tab_analise_anuncios():
     """Renderiza a aba de Análise de Anúncios com IA"""
     
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-title">Análise Inteligente de Anúncios com IA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">Análise de Anúncios: Maximize seu Lucro no Mercado Livre</div>', unsafe_allow_html=True)
     
     # Seção de configuração
     st.markdown("### Configuração")

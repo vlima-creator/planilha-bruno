@@ -4,7 +4,7 @@ def render_tab_guia_uso():
     """Renderiza a aba de Guia de Uso com instruções e explicação de cálculos em seções expansíveis"""
     
     st.markdown("<div class=\"chart-container\">", unsafe_allow_html=True)
-    st.markdown("<div class=\"chart-title\">Guia de Uso - Gestão de Devolução Inteligente</div>", unsafe_allow_html=True)
+    st.markdown("<div class=\"chart-title\">Guia de Uso: Maximizando seu Lucro com Devoluções</div>", unsafe_allow_html=True)
     
     # ─────────────────────────────────────────────────────────
     # SEÇÃO 1: COMO COMEÇAR

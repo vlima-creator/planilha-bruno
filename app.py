@@ -19,11 +19,15 @@ from tab_guia_uso import render_tab_guia_uso
 
 # Configuração da página
 st.set_page_config(
-    page_title="Gestão de Devolução Inteligente",
+    page_title="Lucro Real: Devoluções Inteligentes no Mercado Livre",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+st.title("Lucro Real: Devoluções Inteligentes no Mercado Livre")
+st.markdown("**Recupere sua rentabilidade identificando custos ocultos e vazamentos financeiros nas suas devoluções do Mercado Livre.**")
+st.markdown("**Análise 100% segura: seus dados nunca saem do seu computador.**")
 
 # CSS customizado
 st.markdown("""
@@ -644,7 +648,9 @@ else:
         # Garantir que a janela global atual esteja sempre na lista (caso seja um valor customizado)
         if janela_global not in janelas_list:
             janelas_list.append(janela_global)
-            janelas_list.sort()
+            
+        # Inverter a ordem para começar do maior para o menor (ex: 180d -> 7d)
+        janelas_list.sort(reverse=True)
             
         janelas_data_raw = []
         
