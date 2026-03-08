@@ -127,7 +127,9 @@ def ler_vendas(file):
             # Converter números ML
             for col in df.columns:
                 if isinstance(col, str) and ('BRL' in col or 'Receita' in col or 'Custo' in col or 'Taxa' in col):
-                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                    # Evitar converter colunas de texto que possam conter palavras-chave mas não são valores
+                    if col not in ['Motivo do resultado', 'Resultado', 'Descrição do status']:
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         df['Plataforma'] = plataforma
         return df
@@ -173,7 +175,7 @@ def ler_devolucoes(file):
                 for col in df.columns:
                     if isinstance(col, str) and ('BRL' in col or 'Receita' in col or 'Custo' in col or 'Taxa' in col):
                         # Evitar converter colunas de texto que possam conter palavras-chave mas não são valores
-                        if col not in ['Motivo do resultado', 'Resultado']:
+                        if col not in ['Motivo do resultado', 'Resultado', 'Descrição do status']:
                             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
                 
                 if 'Cancelamentos e reembolsos (BRL)' in df.columns:

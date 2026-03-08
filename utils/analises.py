@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import re
 from datetime import datetime, timedelta
 
 def preparar_dados_analise(vendas, matriz, full):
@@ -85,13 +86,64 @@ def analisar_frete(vendas, matriz, full, max_date, dias_atras):
     cols_ordem = ['Forma de Entrega', 'Vendas', 'Cancelados', 'Devoluções', 'Taxa (%)', 'Impacto (R$)']
     return res[cols_ordem]
 
+def extrair_motivo_status(descricao):
+    """Extrai o motivo da devolução ou cancelamento a partir da descrição do status."""
+    if not isinstance(descricao, str) or descricao.strip() == '':
+        return 'Não informado'
+    
+    # 1. Tentar padrões de "porque" (comum em devoluções e cancelamentos)
+    padroes = [
+        r"porque (.+)",
+        r"reclamou que (.+)",
+        r"especificou que (.+)",
+        r"devolveu porque (.+)",
+        r"cancelou porque (.+)"
+    ]
+    
+    for padrao in padroes:
+        match = re.search(padrao, descricao, re.IGNORECASE)
+        if match:
+            motivo = match.group(1).strip()
+            # Mapeamentos de normalização
+            mapeamento = {
+                "se arrependeu da compra": "Arrependimento de compra",
+                "está com defeito": "Produto com defeito",
+                "não funciona": "Produto não funciona",
+                "não serviu": "Tamanho incorreto",
+                "é diferente do que eu pedi": "Produto incorreto",
+                "recebeu algo diferente do que comprou": "Produto incorreto",
+                "a embalagem estava em ordem mas o produto não funciona": "Produto não funciona",
+                "especificou outro problema": "Outro problema",
+                "outro problema": "Outro problema"
+            }
+            
+            for original, novo in mapeamento.items():
+                if original in motivo.lower():
+                    return novo
+            
+            motivo = motivo.split('.')[0].strip()
+            return motivo.capitalize()
+    
+    # 2. Tentar frases fixas comuns
+    if "reembolsamos o dinheiro ao comprador" in descricao.lower():
+        return "Reembolso direto"
+    if "revisamos sua reclamação e mantivemos a resolução original" in descricao.lower():
+        return "Reclamação mantida"
+    if "você pode vê-lo na sua conta mercado pago" in descricao.lower():
+        return "Reembolso concluído"
+    if "entendemos que você recebeu o produto conforme o esperado" in descricao.lower():
+        return "Devolução recebida OK"
+    if "o comprador não poderá reiniciar uma reclamação" in descricao.lower():
+        return "Reclamação encerrada"
+
+    return 'Não informado'
+
 def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
     """Análise qualitativa de motivos de devolução."""
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
     col_motivo = None
     # Priorizar 'Motivo do resultado' pois contém o motivo real preenchido pelo vendedor/comprador
-    # 'Estado' geralmente contém o status logístico da devolução
     for col in ['Motivo do resultado', 'Motivo', 'Resultado', 'Estado']:
         if col in todas_dev.columns:
             # Verificar se a coluna não está vazia ou apenas com espaços
@@ -99,7 +151,6 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
                 col_motivo = col
                 break
     
-    # Se não encontrou nenhuma com dados, usa a primeira disponível
     if not col_motivo:
         for col in ['Motivo do resultado', 'Motivo', 'Resultado', 'Estado']:
             if col in todas_dev.columns:
@@ -116,8 +167,32 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
 
     # Cruzar com SKUs das vendas
     if 'N.º de venda' in todas_dev.columns and 'N.º de venda' in vendas_periodo.columns:
-        vendas_subset = vendas_periodo[['N.º de venda', 'SKU', 'Título do anúncio']].drop_duplicates(subset=['N.º de venda'])
-        todas_dev = pd.merge(todas_dev, vendas_subset, on='N.º de venda', how='left')
+        vendas_subset = vendas_periodo[['N.º de venda', 'SKU', 'Título do anúncio', 'Descrição do status']].drop_duplicates(subset=['N.º de venda'])
+        
+        # Se o relatório de devoluções não tem 'Descrição do status', pegar do relatório de vendas
+        if 'Descrição do status' not in todas_dev.columns:
+            todas_dev = pd.merge(todas_dev, vendas_subset, on='N.º de venda', how='left')
+        else:
+            # Se já tem, mesclar apenas SKU e Título
+            todas_dev = pd.merge(todas_dev, vendas_subset[['N.º de venda', 'SKU', 'Título do anúncio']], on='N.º de venda', how='left')
+
+    # Aplicar a extração de motivos
+    todas_dev['Motivo'] = todas_dev['Motivo'].fillna('Não informado').replace(r'^\s*$', 'Não informado', regex=True)
+    
+    if 'Descrição do status' in todas_dev.columns:
+        todas_dev['Motivo_Extraido'] = todas_dev['Descrição do status'].apply(extrair_motivo_status)
+        
+        # Lógica de priorização:
+        # 1. Se o motivo original é 'Não informado' ou termos genéricos do ML ('está em boas condições')
+        # 2. E o motivo extraído é útil (não é 'Não informado')
+        # 3. Então usar o extraído
+        termos_genericos = ['está em boas condições', 'não informado', 'revisado pelo mercado livre']
+        
+        todas_dev['Motivo'] = todas_dev.apply(
+            lambda row: row['Motivo_Extraido'] if (str(row['Motivo']).lower() in termos_genericos) and row['Motivo_Extraido'] != 'Não informado' else row['Motivo'],
+            axis=1
+        )
+        todas_dev = todas_dev.drop(columns=['Motivo_Extraido'])
 
     for col in ['SKU', 'Título do anúncio', 'Motivo']:
         if col not in todas_dev.columns: todas_dev[col] = 'Não informado'
@@ -130,16 +205,14 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     vendas_periodo, todas_dev = preparar_dados_analise(vendas, matriz, full)
     
     col_ads = 'Venda por publicidade'
-    # Tentar encontrar a coluna de receita correta (ML ou Shopee)
     col_receita = 'Receita por produtos (BRL)'
     if col_receita not in vendas_periodo.columns:
-        col_receita = 'Subtotal do produto' # Shopee fallback
+        col_receita = 'Subtotal do produto'
     if col_receita not in vendas_periodo.columns:
-        col_receita = 'Preço unitário (BRL)' # Outro fallback
+        col_receita = 'Preço unitário (BRL)'
     
     if col_ads not in vendas_periodo.columns: vendas_periodo[col_ads] = 'Não'
     
-    # Garantir que a coluna de receita seja numérica
     if col_receita in vendas_periodo.columns:
         vendas_periodo[col_receita] = pd.to_numeric(vendas_periodo[col_receita], errors='coerce').fillna(0.0)
     else:
@@ -154,20 +227,15 @@ def analisar_ads(vendas, matriz, full, max_date, dias_atras):
     
     impacto_map = {}
     if not todas_dev.empty:
-        # Priorizar coluna de reembolso já identificada como correta
         val_col = 'Cancelamentos e reembolsos (BRL)'
         if val_col not in todas_dev.columns:
-            # Fallback para Shopee ou outras colunas de valor
             val_col = 'Quantia total de reembolsos' if 'Quantia total de reembolsos' in todas_dev.columns else todas_dev.columns[0]
             
         todas_dev['valor_temp'] = pd.to_numeric(todas_dev[val_col], errors='coerce').fillna(0).abs()
         impacto_map = todas_dev.groupby('N.º de venda')['valor_temp'].sum().to_dict()
 
     vendas_periodo['valor_dev'] = vendas_periodo.apply(lambda x: impacto_map.get(x['N.º de venda'], 0.0) if x['is_devolucao'] else 0.0, axis=1)
-    
-    # Criar coluna de receita efetiva (apenas para vendas não canceladas)
     vendas_periodo['receita_efetiva'] = vendas_periodo.apply(lambda x: x[col_receita] if not x['is_cancelado'] else 0.0, axis=1)
-    
     vendas_periodo['Tipo'] = vendas_periodo[col_ads].apply(lambda x: 'Com Publicidade' if x == 'Sim' else 'Orgânico')
     
     res = vendas_periodo.groupby('Tipo').agg(
@@ -198,13 +266,10 @@ def analisar_skus(vendas, matriz, full, max_date, dias_atras, limit=None, agrupa
     impacto_map = {}
     custo_log_map = {}
     if not todas_dev.empty:
-        # 1. Reembolso (Impacto Financeiro)
         val_col = 'Cancelamentos e reembolsos (BRL)'
         if val_col not in todas_dev.columns:
             val_col = 'Quantia total de reembolsos' if 'Quantia total de reembolsos' in todas_dev.columns else todas_dev.columns[0]
         
-        # 2. Custos Logísticos (Tarifas de envio + Tarifas de venda)
-        # No ML, quando há devolução, o vendedor muitas vezes paga o frete de volta e perde a comissão
         col_envio = 'Tarifas de envio (BRL)'
         col_venda = 'Tarifa de venda e impostos (BRL)'
         
