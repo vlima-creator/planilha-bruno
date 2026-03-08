@@ -739,37 +739,17 @@ else:
             st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #f8fafc;">Matriz</div>', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_matriz['devolucoes_vendas'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("DEVOLUÇÕES", formatar_numero(metricas_matriz['devolucoes_vendas']), "Total no período", "devolucoes")
             with c2:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_matriz['taxa_devolucao'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("TAXA", formatar_percentual(metricas_matriz['taxa_devolucao']), "Percentual de dev.", "ia")
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_matriz['impacto_devolucao'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("IMPACTO", formatar_brl(metricas_matriz['impacto_devolucao']), "Custo de devolução", "faturamento")
             with c2:
                 # Calcular Top 10 concentração para Matriz
                 df_skus_m, total_dev_m = analisar_skus(data['vendas'], data['matriz'], None, data['max_date'], janela_global, agrupar_por=agrupar_por)
                 top10_m = (df_skus_m.sort_values('Dev', ascending=False).head(10)['Dev'].sum() / total_dev_m * 100) if total_dev_m > 0 and len(df_skus_m) > 0 else 0
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_pct_direto(top10_m)}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("TOP 10 CONC.", formatar_pct_direto(top10_m), "Volume de devoluções", "ia")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col_full:
@@ -777,36 +757,16 @@ else:
             st.markdown('<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: #f8fafc;">Full</div>', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Devoluções</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_numero(metricas_full['devolucoes_vendas'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("DEVOLUÇÕES", formatar_numero(metricas_full['devolucoes_vendas']), "Total no período", "devolucoes")
             with c2:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Taxa</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_percentual(metricas_full['taxa_devolucao'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("TAXA", formatar_percentual(metricas_full['taxa_devolucao']), "Percentual de dev.", "ia")
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Impacto</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_brl(metricas_full['impacto_devolucao'])}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("IMPACTO", formatar_brl(metricas_full['impacto_devolucao']), "Custo de devolução", "faturamento")
             with c2:
                 df_skus_f, total_dev_f = analisar_skus(data['vendas'], None, data['full'], data['max_date'], janela_global, agrupar_por=agrupar_por)
                 top10_f = (df_skus_f.sort_values('Dev', ascending=False).head(10)['Dev'].sum() / total_dev_f * 100) if total_dev_f > 0 and len(df_skus_f) > 0 else 0
-                st.markdown(f"""
-                    <div style="padding: 15px; background-color: #334155; border-radius: 8px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px;">Top 10 Conc.</div>
-                        <div style="color: #f8fafc; font-size: 1.8rem; font-weight: 700;">{formatar_pct_direto(top10_f)}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_metric_card("TOP 10 CONC.", formatar_pct_direto(top10_f), "Volume de devoluções", "ia")
             st.markdown('</div>', unsafe_allow_html=True)
         
         # Gráfico Comparativo
