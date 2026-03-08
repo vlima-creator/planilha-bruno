@@ -1,14 +1,14 @@
 """
 Módulo para exportar análises de anúncios para PDF
 Versão polida com design profissional e amigável
-Utiliza fpdf2 para suporte completo a Unicode
+Utiliza fpdf2 com suporte completo a Unicode (DejaVu Sans)
 """
 
 from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
 from typing import Dict, Any
-import re
+import os
 
 class PDFRelatorioAnuncio(FPDF):
     """Classe customizada para gerar PDF de análise de anúncios com design profissional"""
@@ -18,6 +18,47 @@ class PDFRelatorioAnuncio(FPDF):
         self.set_margins(18, 18, 18)
         self.set_auto_page_break(auto=True, margin=18)
         
+        # Tentar carregar fonte Unicode (DejaVu Sans) para evitar erros de codificação
+        # Caminhos comuns em sistemas Linux (Ubuntu)
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "utils/fonts/DejaVuSans.ttf" # Fallback local se existir
+        ]
+        
+        font_bold_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "utils/fonts/DejaVuSans-Bold.ttf"
+        ]
+        
+        self.unicode_font = False
+        
+        # Tentar carregar a fonte regular
+        for path in font_paths:
+            if os.path.exists(path):
+                try:
+                    self.add_font("DejaVu", "", path)
+                    self.unicode_font = True
+                    break
+                except:
+                    continue
+        
+        # Tentar carregar a fonte negrito
+        for path in font_bold_paths:
+            if os.path.exists(path):
+                try:
+                    self.add_font("DejaVu", "B", path)
+                    break
+                except:
+                    continue
+        
+        # Definir fonte inicial
+        if self.unicode_font:
+            self.set_font("DejaVu", "", 10)
+        else:
+            self.set_font("Helvetica", "", 10)
+            
     def header(self):
         """Cabeçalho do PDF com design profissional"""
         if self.page_no() == 1:
@@ -26,13 +67,14 @@ class PDFRelatorioAnuncio(FPDF):
             self.rect(0, 0, 210, 45, 'F')
             
             # Título principal
-            self.set_font("Helvetica", "B", 26)
+            font_name = "DejaVu" if self.unicode_font else "Helvetica"
+            self.set_font(font_name, "B", 26)
             self.set_text_color(255, 255, 255)
             self.set_xy(18, 12)
             self.cell(0, 12, "Relatório de Análise", ln=True)
             
             # Subtítulo
-            self.set_font("Helvetica", "", 11)
+            self.set_font(font_name, "", 11)
             self.set_text_color(200, 220, 240)
             self.set_xy(18, 26)
             self.cell(0, 8, "Análise Estratégica de Anúncios com Inteligência Artificial", ln=True)
@@ -44,7 +86,8 @@ class PDFRelatorioAnuncio(FPDF):
             # Cabeçalho simplificado para as demais páginas
             self.set_fill_color(31, 78, 120)
             self.rect(0, 0, 210, 15, 'F')
-            self.set_font("Helvetica", "B", 10)
+            font_name = "DejaVu" if self.unicode_font else "Helvetica"
+            self.set_font(font_name, "B", 10)
             self.set_text_color(255, 255, 255)
             self.set_xy(18, 4)
             self.cell(0, 7, "Relatório de Análise - Inteligência Artificial", ln=True)
@@ -54,7 +97,8 @@ class PDFRelatorioAnuncio(FPDF):
     def footer(self):
         """Rodapé do PDF"""
         self.set_y(-18)
-        self.set_font("Helvetica", "", 8)
+        font_name = "DejaVu" if self.unicode_font else "Helvetica"
+        self.set_font(font_name, "", 8)
         self.set_text_color(128, 128, 128)
         
         # Linha separadora
@@ -78,10 +122,11 @@ class PDFRelatorioAnuncio(FPDF):
         self.set_fill_color(31, 78, 120)
         self.rect(18, self.get_y(), 2, 10, 'F')
         
-        self.set_font("Helvetica", "B", 12)
+        font_name = "DejaVu" if self.unicode_font else "Helvetica"
+        self.set_font(font_name, "B", 12)
         self.set_text_color(31, 78, 120)
         self.set_xy(22, self.get_y() + 1)
-        self.cell(0, 8, limpar_texto_pdf(titulo.upper()), ln=True)
+        self.cell(0, 8, titulo.upper(), ln=True)
         
         self.ln(3)
         self.set_text_color(0, 0, 0)
@@ -91,20 +136,20 @@ class PDFRelatorioAnuncio(FPDF):
         if not value or value.strip() == "" or value.lower() == "não extraído" or value.lower() == "n/a":
             return
             
-        self.set_font("Helvetica", "B", 10)
+        font_name = "DejaVu" if self.unicode_font else "Helvetica"
+        self.set_font(font_name, "B", 10)
         self.set_text_color(60, 60, 60)
-        self.cell(35, 7, f"{limpar_texto_pdf(label)}:", ln=False)
+        self.cell(35, 7, f"{label}:", ln=False)
         
-        self.set_font("Helvetica", "", 10)
+        self.set_font(font_name, "", 10)
         self.set_text_color(0, 0, 0)
         
         # Quebrar valor se muito longo
-        value_limpo = limpar_texto_pdf(str(value))
+        value_limpo = str(value)
         
-        # Se for URL, tratar de forma especial para não quebrar o layout
+        # Se for URL, tratar de forma especial
         if label.upper() == "URL":
             self.set_text_color(31, 78, 120)
-            # Limitar tamanho visual da URL mas manter funcional se possível
             display_url = value_limpo if len(value_limpo) <= 85 else value_limpo[:82] + "..."
             self.cell(0, 7, display_url, ln=True, link=value)
         else:
@@ -117,53 +162,6 @@ class PDFRelatorioAnuncio(FPDF):
                     self.cell(0, 7, linha, ln=True)
         
         self.ln(1)
-
-def limpar_texto_pdf(texto: str) -> str:
-    """Limpa o texto para ser compatível com PDF, removendo caracteres problemáticos"""
-    if not texto:
-        return ""
-    
-    texto = str(texto)
-    
-    # Remover marcadores de markdown comuns
-    texto = texto.replace('**', '').replace('##', '').replace('###', '')
-    texto = texto.replace('`', '').replace('*', '')
-    
-    # Substituir caracteres especiais comuns por equivalentes seguros
-    substituicoes = {
-        '\u201c': '"', '\u201d': '"',  # Aspas curvas
-        '\u2018': "'", '\u2019': "'",  # Aspas simples
-        '\u2013': '-', '\u2014': '-',  # Travessões
-        '\u2026': '...',               # Reticências
-        '\u2022': '*',                 # Bullet
-        '\u25ba': '>',                 # Seta
-        '\u2705': 'OK',                # Checkmark emoji
-        '\u274c': 'X',                 # Cross emoji
-        '\u26a0': '!',                 # Warning emoji
-        '\ud83d\udca1': '!',           # Light bulb
-        '\ud83d\ude80': '>',           # Rocket
-        '\ud83d\udccb': '-',           # Clipboard
-        '\ud83d\udce6': '-',           # Package
-        '\ud83d\udcb0': '$',           # Money bag
-        '\ud83d\udcca': '-',           # Chart
-        '\ud83d\udc4d': 'OK',          # Thumbs up
-    }
-    
-    for char_problema, char_seguro in substituicoes.items():
-        texto = texto.replace(char_problema, char_seguro)
-    
-    # Remover qualquer outro caractere que não seja Latin-1 (que a fonte Helvetica suporta)
-    # Isso remove emojis e outros símbolos especiais que a IA possa ter gerado
-    texto_latin1 = ""
-    for char in texto:
-        try:
-            char.encode('latin-1')
-            texto_latin1 += char
-        except UnicodeEncodeError:
-            # Se não puder codificar em latin-1, ignoramos o caractere ou substituímos por algo neutro
-            continue
-            
-    return texto_latin1
 
 def quebrar_texto(texto: str, max_chars: int = 80) -> list:
     """Quebra o texto em linhas com número máximo de caracteres"""
@@ -222,13 +220,14 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     
     if dados_anuncio.get('descricao') and str(dados_anuncio.get('descricao')).strip():
         pdf.ln(2)
-        pdf.set_font("Helvetica", "B", 10)
+        font_name = "DejaVu" if pdf.unicode_font else "Helvetica"
+        pdf.set_font(font_name, "B", 10)
         pdf.set_text_color(60, 60, 60)
         pdf.cell(0, 7, "Descrição do Produto:", ln=True)
         
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font(font_name, "", 9)
         pdf.set_text_color(30, 30, 30)
-        desc = limpar_texto_pdf(str(dados_anuncio.get('descricao')))[:500]
+        desc = str(dados_anuncio.get('descricao'))[:500]
         if len(str(dados_anuncio.get('descricao'))) > 500:
             desc += "..."
             
@@ -246,23 +245,24 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     
     # Processar análise linha por linha
     linhas_analise = analise_ia.split('\n')
+    font_name = "DejaVu" if pdf.unicode_font else "Helvetica"
     
     for linha in linhas_analise:
-        linha_limpa = limpar_texto_pdf(linha.strip())
+        linha_strip = linha.strip()
         
-        if not linha_limpa:
+        if not linha_strip:
             pdf.ln(2)
             continue
         
         # Detectar títulos de seção (## ou 1. Título)
-        if linha.startswith('##') or (linha_limpa and linha_limpa[0].isdigit() and '. ' in linha_limpa[:4] and len(linha_limpa) < 100):
+        if linha.startswith('##') or (linha_strip and linha_strip[0].isdigit() and '. ' in linha_strip[:4] and len(linha_strip) < 100):
             pdf.ln(2)
             if pdf.get_y() > 250:
                 pdf.add_page()
                 
-            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_font(font_name, "B", 11)
             pdf.set_text_color(31, 78, 120)
-            titulo_secao = linha_limpa.lstrip('#').strip()
+            titulo_secao = linha_strip.lstrip('#').strip()
             pdf.cell(0, 8, titulo_secao, ln=True)
             
             pdf.set_draw_color(31, 78, 120)
@@ -274,21 +274,21 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         # Detectar subtítulos (###)
         elif linha.startswith('###'):
             pdf.ln(1)
-            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_font(font_name, "B", 10)
             pdf.set_text_color(50, 100, 150)
-            pdf.cell(0, 7, f"  > {linha_limpa.lstrip('#').strip()}", ln=True)
+            pdf.cell(0, 7, f"  > {linha_strip.lstrip('#').strip()}", ln=True)
             pdf.set_text_color(0, 0, 0)
         
         # Detectar listas
-        elif linha_limpa.startswith('-') or linha_limpa.startswith('*') or linha_limpa.startswith('[ ]') or linha_limpa.startswith('[x]'):
-            pdf.set_font("Helvetica", "", 9)
+        elif linha_strip.startswith('-') or linha_strip.startswith('*') or linha_strip.startswith('[ ]') or linha_strip.startswith('[x]'):
+            pdf.set_font(font_name, "", 9)
             pdf.set_text_color(40, 40, 40)
             
             marcador = "•"
-            texto_item = linha_limpa.lstrip('-* ').strip()
-            if linha_limpa.startswith('['):
-                marcador = "□" if '[ ]' in linha_limpa else "▣"
-                texto_item = linha_limpa[3:].strip()
+            texto_item = linha_strip.lstrip('-* ').strip()
+            if linha_strip.startswith('['):
+                marcador = "□" if '[ ]' in linha_strip else "▣"
+                texto_item = linha_strip[3:].strip()
                 
             linhas_quebradas = quebrar_texto(texto_item, 80)
             for i, linha_quebrada in enumerate(linhas_quebradas):
@@ -301,9 +301,9 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         
         # Texto normal
         else:
-            pdf.set_font("Helvetica", "", 9)
+            pdf.set_font(font_name, "", 9)
             pdf.set_text_color(0, 0, 0)
-            linhas_quebradas = quebrar_texto(linha_limpa, 85)
+            linhas_quebradas = quebrar_texto(linha_strip, 85)
             for linha_quebrada in linhas_quebradas:
                 pdf.cell(0, 5, linha_quebrada, ln=True)
     
@@ -312,11 +312,11 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     if pdf.get_y() > 260:
         pdf.add_page()
         
-    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_font(font_name, "I", 8)
     pdf.set_text_color(128, 128, 128)
     
     rodape = "Este relatório foi gerado automaticamente pela ferramenta de Análise Inteligente de Anúncios. As recomendações são baseadas em algoritmos de IA e devem ser validadas conforme o contexto do seu negócio."
-    linhas_rodape = quebrar_texto(limpar_texto_pdf(rodape), 95)
+    linhas_rodape = quebrar_texto(rodape, 95)
     for linha in linhas_rodape:
         pdf.cell(0, 4, linha, ln=True, align="C")
     
