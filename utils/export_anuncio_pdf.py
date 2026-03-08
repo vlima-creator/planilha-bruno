@@ -8,6 +8,7 @@ from fpdf import FPDF
 from io import BytesIO
 from datetime import datetime
 from typing import Dict, Any
+import re
 
 class PDFRelatorioAnuncio(FPDF):
     """Classe customizada para gerar PDF de análise de anúncios com design profissional"""
@@ -80,7 +81,7 @@ class PDFRelatorioAnuncio(FPDF):
         self.set_font("Helvetica", "B", 12)
         self.set_text_color(31, 78, 120)
         self.set_xy(22, self.get_y() + 1)
-        self.cell(0, 8, titulo.upper(), ln=True)
+        self.cell(0, 8, limpar_texto_pdf(titulo.upper()), ln=True)
         
         self.ln(3)
         self.set_text_color(0, 0, 0)
@@ -92,7 +93,7 @@ class PDFRelatorioAnuncio(FPDF):
             
         self.set_font("Helvetica", "B", 10)
         self.set_text_color(60, 60, 60)
-        self.cell(35, 7, f"{label}:", ln=False)
+        self.cell(35, 7, f"{limpar_texto_pdf(label)}:", ln=False)
         
         self.set_font("Helvetica", "", 10)
         self.set_text_color(0, 0, 0)
@@ -103,7 +104,7 @@ class PDFRelatorioAnuncio(FPDF):
         # Se for URL, tratar de forma especial para não quebrar o layout
         if label.upper() == "URL":
             self.set_text_color(31, 78, 120)
-            # Limitar tamanho visual da URL mas manter funcional se possível (fpdf2 suporta links)
+            # Limitar tamanho visual da URL mas manter funcional se possível
             display_url = value_limpo if len(value_limpo) <= 85 else value_limpo[:82] + "..."
             self.cell(0, 7, display_url, ln=True, link=value)
         else:
@@ -128,7 +129,7 @@ def limpar_texto_pdf(texto: str) -> str:
     texto = texto.replace('**', '').replace('##', '').replace('###', '')
     texto = texto.replace('`', '').replace('*', '')
     
-    # Substituir caracteres especiais por equivalentes seguros para Helvetica padrão
+    # Substituir caracteres especiais comuns por equivalentes seguros
     substituicoes = {
         '\u201c': '"', '\u201d': '"',  # Aspas curvas
         '\u2018': "'", '\u2019': "'",  # Aspas simples
@@ -136,13 +137,33 @@ def limpar_texto_pdf(texto: str) -> str:
         '\u2026': '...',               # Reticências
         '\u2022': '*',                 # Bullet
         '\u25ba': '>',                 # Seta
+        '\u2705': 'OK',                # Checkmark emoji
+        '\u274c': 'X',                 # Cross emoji
+        '\u26a0': '!',                 # Warning emoji
+        '\ud83d\udca1': '!',           # Light bulb
+        '\ud83d\ude80': '>',           # Rocket
+        '\ud83d\udccb': '-',           # Clipboard
+        '\ud83d\udce6': '-',           # Package
+        '\ud83d\udcb0': '$',           # Money bag
+        '\ud83d\udcca': '-',           # Chart
+        '\ud83d\udc4d': 'OK',          # Thumbs up
     }
     
     for char_problema, char_seguro in substituicoes.items():
         texto = texto.replace(char_problema, char_seguro)
     
-    # Remover outros caracteres não-latin1 que podem quebrar o FPDF com fontes padrão
-    return texto.encode('latin-1', 'replace').decode('latin-1')
+    # Remover qualquer outro caractere que não seja Latin-1 (que a fonte Helvetica suporta)
+    # Isso remove emojis e outros símbolos especiais que a IA possa ter gerado
+    texto_latin1 = ""
+    for char in texto:
+        try:
+            char.encode('latin-1')
+            texto_latin1 += char
+        except UnicodeEncodeError:
+            # Se não puder codificar em latin-1, ignoramos o caractere ou substituímos por algo neutro
+            continue
+            
+    return texto_latin1
 
 def quebrar_texto(texto: str, max_chars: int = 80) -> list:
     """Quebra o texto em linhas com número máximo de caracteres"""
@@ -185,7 +206,6 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     pdf.section_header("Informações do Anúncio")
     
     # Só mostrar campos que não estão vazios
-    tem_info = False
     campos = [
         ("Título", dados_anuncio.get('titulo')),
         ("Preço", dados_anuncio.get('preco')),
@@ -196,9 +216,8 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     for label, valor in campos:
         if valor and str(valor).strip() and str(valor).lower() not in ["não extraído", "n/a", ""]:
             pdf.info_row(label, str(valor))
-            tem_info = True
             
-    # URL sempre mostramos (conforme pedido do usuário)
+    # URL sempre mostramos
     pdf.info_row("URL", url)
     
     if dados_anuncio.get('descricao') and str(dados_anuncio.get('descricao')).strip():
@@ -220,7 +239,6 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     pdf.ln(5)
     
     # ========== SEÇÃO 2: ANÁLISE DETALHADA ==========
-    # Se a análise for longa, já começamos em uma nova página para organização
     if pdf.get_y() > 150:
         pdf.add_page()
         
@@ -239,17 +257,14 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         # Detectar títulos de seção (## ou 1. Título)
         if linha.startswith('##') or (linha_limpa and linha_limpa[0].isdigit() and '. ' in linha_limpa[:4] and len(linha_limpa) < 100):
             pdf.ln(2)
-            # Verificar se precisa de nova página
             if pdf.get_y() > 250:
                 pdf.add_page()
                 
             pdf.set_font("Helvetica", "B", 11)
             pdf.set_text_color(31, 78, 120)
-            # Remover o prefixo ## se existir
             titulo_secao = linha_limpa.lstrip('#').strip()
             pdf.cell(0, 8, titulo_secao, ln=True)
             
-            # Linha decorativa abaixo do título
             pdf.set_draw_color(31, 78, 120)
             pdf.set_line_width(0.3)
             pdf.line(18, pdf.get_y(), 60, pdf.get_y())
@@ -264,12 +279,11 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
             pdf.cell(0, 7, f"  > {linha_limpa.lstrip('#').strip()}", ln=True)
             pdf.set_text_color(0, 0, 0)
         
-        # Detectar listas (hífen, asterisco ou [ ])
+        # Detectar listas
         elif linha_limpa.startswith('-') or linha_limpa.startswith('*') or linha_limpa.startswith('[ ]') or linha_limpa.startswith('[x]'):
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(40, 40, 40)
             
-            # Tratar o marcador
             marcador = "•"
             texto_item = linha_limpa.lstrip('-* ').strip()
             if linha_limpa.startswith('['):
@@ -302,7 +316,7 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     pdf.set_text_color(128, 128, 128)
     
     rodape = "Este relatório foi gerado automaticamente pela ferramenta de Análise Inteligente de Anúncios. As recomendações são baseadas em algoritmos de IA e devem ser validadas conforme o contexto do seu negócio."
-    linhas_rodape = quebrar_texto(rodape, 95)
+    linhas_rodape = quebrar_texto(limpar_texto_pdf(rodape), 95)
     for linha in linhas_rodape:
         pdf.cell(0, 4, linha, ln=True, align="C")
     
