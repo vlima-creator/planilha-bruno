@@ -23,38 +23,50 @@ class PDFRelatorioAnuncio(FPDF):
         font_regular = os.path.join(base_path, "fonts", "DejaVuSans.ttf")
         font_bold = os.path.join(base_path, "fonts", "DejaVuSans-Bold.ttf")
         
-        # Caminhos alternativos do sistema (Linux/Ubuntu)
-        sys_font_regular = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-        sys_font_bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        
         self.unicode_font = False
+        self.unicode_bold = False
         
-        # Tentar carregar a fonte regular (Local primeiro, depois Sistema)
-        for path in [font_regular, sys_font_regular]:
-            if os.path.exists(path):
-                try:
-                    self.add_font("DejaVu", "", path)
-                    self.unicode_font = True
-                    break
-                except:
-                    continue
+        # Tentar carregar a fonte regular
+        if os.path.exists(font_regular):
+            try:
+                self.add_font("DejaVu", "", font_regular)
+                self.unicode_font = True
+            except:
+                pass
         
         # Tentar carregar a fonte negrito
-        for path in [font_bold, sys_font_bold]:
-            if os.path.exists(path):
-                try:
-                    self.add_font("DejaVu", "B", path)
-                    break
-                except:
-                    continue
+        if os.path.exists(font_bold):
+            try:
+                self.add_font("DejaVu", "B", font_bold)
+                self.unicode_bold = True
+            except:
+                pass
         
         # Definir fonte inicial
         if self.unicode_font:
             self.set_font("DejaVu", "", 10)
         else:
-            # Fallback para Helvetica se tudo falhar
             self.set_font("Helvetica", "", 10)
             
+    def safe_set_font(self, family, style='', size=10):
+        """Define a fonte de forma segura, evitando erros de estilos não carregados"""
+        # Se a família for DejaVu, verificar se o estilo está disponível
+        if family == "DejaVu":
+            if style == 'B' and not self.unicode_bold:
+                style = ''
+            if style == 'I' or style == 'BI': # Não temos itálico carregado
+                style = style.replace('I', '')
+            
+            # Se a fonte base não estiver carregada, volta para Helvetica
+            if not self.unicode_font:
+                family = "Helvetica"
+        
+        try:
+            self.set_font(family, style, size)
+        except:
+            # Fallback absoluto para Helvetica normal
+            self.set_font("Helvetica", "", size)
+
     def header(self):
         """Cabeçalho do PDF com design profissional"""
         if self.page_no() == 1:
@@ -64,13 +76,13 @@ class PDFRelatorioAnuncio(FPDF):
             
             # Título principal
             font_name = "DejaVu" if self.unicode_font else "Helvetica"
-            self.set_font(font_name, "B", 26)
+            self.safe_set_font(font_name, "B", 26)
             self.set_text_color(255, 255, 255)
             self.set_xy(18, 12)
             self.cell(0, 12, self.limpar_texto("Relatório de Análise"), ln=True)
             
             # Subtítulo
-            self.set_font(font_name, "", 11)
+            self.safe_set_font(font_name, "", 11)
             self.set_text_color(200, 220, 240)
             self.set_xy(18, 26)
             self.cell(0, 8, self.limpar_texto("Análise Estratégica de Anúncios com Inteligência Artificial"), ln=True)
@@ -83,7 +95,7 @@ class PDFRelatorioAnuncio(FPDF):
             self.set_fill_color(31, 78, 120)
             self.rect(0, 0, 210, 15, 'F')
             font_name = "DejaVu" if self.unicode_font else "Helvetica"
-            self.set_font(font_name, "B", 10)
+            self.safe_set_font(font_name, "B", 10)
             self.set_text_color(255, 255, 255)
             self.set_xy(18, 4)
             self.cell(0, 7, self.limpar_texto("Relatório de Análise - Inteligência Artificial"), ln=True)
@@ -94,7 +106,7 @@ class PDFRelatorioAnuncio(FPDF):
         """Rodapé do PDF"""
         self.set_y(-18)
         font_name = "DejaVu" if self.unicode_font else "Helvetica"
-        self.set_font(font_name, "", 8)
+        self.safe_set_font(font_name, "", 8)
         self.set_text_color(128, 128, 128)
         
         # Linha separadora
@@ -119,7 +131,7 @@ class PDFRelatorioAnuncio(FPDF):
         self.rect(18, self.get_y(), 2, 10, 'F')
         
         font_name = "DejaVu" if self.unicode_font else "Helvetica"
-        self.set_font(font_name, "B", 12)
+        self.safe_set_font(font_name, "B", 12)
         self.set_text_color(31, 78, 120)
         self.set_xy(22, self.get_y() + 1)
         self.cell(0, 8, self.limpar_texto(titulo.upper()), ln=True)
@@ -133,11 +145,11 @@ class PDFRelatorioAnuncio(FPDF):
             return
             
         font_name = "DejaVu" if self.unicode_font else "Helvetica"
-        self.set_font(font_name, "B", 10)
+        self.safe_set_font(font_name, "B", 10)
         self.set_text_color(60, 60, 60)
         self.cell(35, 7, self.limpar_texto(f"{label}:"), ln=False)
         
-        self.set_font(font_name, "", 10)
+        self.safe_set_font(font_name, "", 10)
         self.set_text_color(0, 0, 0)
         
         # Quebrar valor se muito longo
@@ -261,11 +273,11 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     if dados_anuncio.get('descricao') and str(dados_anuncio.get('descricao')).strip():
         pdf.ln(2)
         font_name = "DejaVu" if pdf.unicode_font else "Helvetica"
-        pdf.set_font(font_name, "B", 10)
+        pdf.safe_set_font(font_name, "B", 10)
         pdf.set_text_color(60, 60, 60)
         pdf.cell(0, 7, pdf.limpar_texto("Descrição do Produto:"), ln=True)
         
-        pdf.set_font(font_name, "", 9)
+        pdf.safe_set_font(font_name, "", 9)
         pdf.set_text_color(30, 30, 30)
         desc = str(dados_anuncio.get('descricao'))[:500]
         if len(str(dados_anuncio.get('descricao'))) > 500:
@@ -300,7 +312,7 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
             if pdf.get_y() > 250:
                 pdf.add_page()
                 
-            pdf.set_font(font_name, "B", 11)
+            pdf.safe_set_font(font_name, "B", 11)
             pdf.set_text_color(31, 78, 120)
             titulo_secao = linha_strip.lstrip('#').strip()
             pdf.cell(0, 8, pdf.limpar_texto(titulo_secao), ln=True)
@@ -314,14 +326,14 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         # Detectar subtítulos (###)
         elif linha.startswith('###'):
             pdf.ln(1)
-            pdf.set_font(font_name, "B", 10)
+            pdf.safe_set_font(font_name, "B", 10)
             pdf.set_text_color(50, 100, 150)
             pdf.cell(0, 7, f"  > {pdf.limpar_texto(linha_strip.lstrip('#').strip())}", ln=True)
             pdf.set_text_color(0, 0, 0)
         
         # Detectar listas
         elif linha_strip.startswith('-') or linha_strip.startswith('*') or linha_strip.startswith('[ ]') or linha_strip.startswith('[x]'):
-            pdf.set_font(font_name, "", 9)
+            pdf.safe_set_font(font_name, "", 9)
             pdf.set_text_color(40, 40, 40)
             
             marcador = "•"
@@ -341,7 +353,7 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
         
         # Texto normal
         else:
-            pdf.set_font(font_name, "", 9)
+            pdf.safe_set_font(font_name, "", 9)
             pdf.set_text_color(0, 0, 0)
             linhas_quebradas = quebrar_texto(linha_strip, 85)
             for linha_quebrada in linhas_quebradas:
@@ -352,7 +364,7 @@ def gerar_pdf_analise_anuncio(dados_anuncio: Dict[str, Any], analise_ia: str, ur
     if pdf.get_y() > 260:
         pdf.add_page()
         
-    pdf.set_font(font_name, "I", 8)
+    pdf.safe_set_font(font_name, "I", 8)
     pdf.set_text_color(128, 128, 128)
     
     rodape = "Este relatório foi gerado automaticamente pela ferramenta de Análise Inteligente de Anúncios. As recomendações são baseadas em algoritmos de IA e devem ser validadas conforme o contexto do seu negócio."
