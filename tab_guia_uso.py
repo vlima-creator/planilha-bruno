@@ -18,13 +18,13 @@ def render_tab_guia_uso():
 
         Para usar esta ferramenta, você precisa de **dois arquivos Excel** de cada plataforma (Mercado Livre ou Shopee):
 
-        #### 📊 Relatório de Vendas (Mercado Livre)
+        #### 📊 Relatório de Vendas (Marketplaces)
         1. Acesse: **Vendas > Relatórios > Relatório de Vendas**
         2. Configure o período desejado
         3. Clique em **"Descarregar"** (formato Excel)
         4. Salve o arquivo como `vendas.xlsx`
 
-        #### 📦 Relatório de Devoluções (Mercado Livre)
+        #### 📦 Relatório de Devoluções (Marketplaces)
         1. Acesse: **Devoluções > Relatório de Devoluções**
         2. Configure o mesmo período das vendas
         3. Clique em **"Descarregar"** (formato Excel)
@@ -66,13 +66,13 @@ def render_tab_guia_uso():
         st.markdown("""
         ### 📍 Localização Exata dos Relatórios
 
-        #### Mercado Livre
+#### Marketplaces (Ex: Mercado Livre)
         ```
         Painel do Vendedor
         └── Vendas
             └── Relatórios
                 └── Relatório de Vendas ← AQUI
-
+        
         Painel do Vendedor
         └── Devoluções
             └── Relatório de Devoluções ← AQUI

@@ -19,14 +19,14 @@ from tab_guia_uso import render_tab_guia_uso
 
 # Configuração da página
 st.set_page_config(
-    page_title="Lucro Real: Devoluções Inteligentes no Mercado Livre",
+    page_title="Devoluções Inteligentes",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("Lucro Real: Devoluções Inteligentes no Mercado Livre")
-st.markdown("**Recupere sua rentabilidade identificando custos ocultos e vazamentos financeiros nas suas devoluções do Mercado Livre.**")
+st.title("Devoluções Inteligentes")
+st.markdown("**Recupere sua rentabilidade identificando custos ocultos e vazamentos financeiros nas suas devoluções nos Marketplaces.**")
 st.markdown("**Análise 100% segura: seus dados nunca saem do seu computador.**")
 
 # CSS customizado
