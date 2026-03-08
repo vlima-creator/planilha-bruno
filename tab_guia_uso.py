@@ -170,6 +170,94 @@ def render_tab_guia_uso():
 
         ---
 
+        ---
+
+        ### 📊 Indicadores de Ads
+
+        Esta seção detalha os indicadores relacionados às vendas e devoluções provenientes de campanhas de publicidade (Ads) e vendas orgânicas.
+
+        #### 1️⃣ Vendas Ads
+        - **Significado**: O número total de pedidos únicos realizados através de campanhas de publicidade pagas.
+        - **Cálculo**: Contagem de IDs de pedidos únicos onde a coluna 'Venda por publicidade' é 'Sim'.
+
+        #### 2️⃣ Devoluções Ads
+        - **Significado**: O número de pedidos únicos provenientes de campanhas de publicidade que resultaram em alguma devolução ou reembolso.
+        - **Cálculo**: Contagem de IDs de pedidos únicos marcados como 'is_devolucao' onde a coluna 'Venda por publicidade' é 'Sim'.
+
+        #### 3️⃣ Taxa Ads (%)
+        - **Significado**: O percentual de vendas efetivamente enviadas (não canceladas) geradas por publicidade que resultaram em uma devolução. Indica a qualidade do anúncio e do produto para o público segmentado.
+        - **Cálculo**: `(Devoluções Ads / (Vendas Ads - Vendas Canceladas Ads)) × 100`
+
+        #### 4️⃣ Impacto Ads (R$)
+        - **Significado**: O valor financeiro total dos reembolsos e custos logísticos associados às devoluções de vendas geradas por publicidade.
+        - **Cálculo**: Soma do 'valor_dev' (reembolsos + custos logísticos) para todos os pedidos com 'Venda por publicidade' igual a 'Sim'.
+
+        #### 5️⃣ Faturamento Ads (R$)
+        - **Significado**: A receita bruta total gerada pelos produtos vendidos através de campanhas de publicidade, excluindo o valor do frete.
+        - **Cálculo**: Soma da 'receita_efetiva' (receita por produtos) para todos os pedidos com 'Venda por publicidade' igual a 'Sim' e que não foram cancelados.
+
+        #### 6️⃣ Vendas Orgânicas
+        - **Significado**: O número total de pedidos únicos realizados sem a influência direta de campanhas de publicidade pagas.
+        - **Cálculo**: Contagem de IDs de pedidos únicos onde a coluna 'Venda por publicidade' é 'Não'.
+
+        #### 7️⃣ Devoluções Orgânicas
+        - **Significado**: O número de pedidos únicos provenientes de vendas orgânicas que resultaram em alguma devolução ou reembolso.
+        - **Cálculo**: Contagem de IDs de pedidos únicos marcados como 'is_devolucao' onde a coluna 'Venda por publicidade' é 'Não'.
+
+        #### 8️⃣ Taxa Orgânica (%)
+        - **Significado**: O percentual de vendas efetivamente enviadas (não canceladas) geradas organicamente que resultaram em uma devolução. Indica a qualidade do produto e a satisfação do cliente sem a influência da publicidade.
+        - **Cálculo**: `(Devoluções Orgânicas / (Vendas Orgânicas - Vendas Canceladas Orgânicas)) × 100`
+
+        ---
+
+        ### 📦 Indicadores de Anúncios (por SKU/Produto)
+
+        Esta seção detalha os indicadores de desempenho e devolução para cada SKU (Stock Keeping Unit) ou produto individual, permitindo uma análise granular.
+
+        #### 1️⃣ Vendas
+        - **Significado**: O número total de pedidos únicos para um SKU específico.
+        - **Cálculo**: Contagem de IDs de pedidos únicos associados a cada SKU.
+
+        #### 2️⃣ Devoluções
+        - **Significado**: O número de pedidos únicos para um SKU específico que resultaram em alguma devolução ou reembolso.
+        - **Cálculo**: Contagem de IDs de pedidos únicos marcados como 'is_devolucao' associados a cada SKU.
+
+        #### 3️⃣ Taxa (%)
+        - **Significado**: O percentual de vendas efetivamente enviadas (não canceladas) de um SKU que resultaram em uma devolução. É um indicador crucial da qualidade do produto ou da precisão do anúncio.
+        - **Cálculo**: `(Devoluções / (Vendas - Cancelados)) × 100` para cada SKU.
+
+        #### 4️⃣ Impacto (R$)
+        - **Significado**: O valor financeiro total que representa o reembolso pago ao comprador e os custos logísticos não recuperáveis para as devoluções de um SKU específico.
+        - **Cálculo**: `Reembolso (R$) + Custo Devolução (R$)` para cada SKU.
+
+        #### 5️⃣ Reembolso (R$)
+        - **Significado**: O valor total dos produtos que foram devolvidos e reembolsados aos compradores para um SKU específico.
+        - **Cálculo**: Soma dos valores de reembolso ('valor_reemb') para as devoluções de cada SKU.
+
+        #### 6️⃣ Custo Devolução (R$)
+        - **Significado**: Representa os custos logísticos (tarifas de envio e venda não recuperadas) que o vendedor não consegue recuperar em uma devolução para um SKU específico.
+        - **Cálculo**: Soma dos custos logísticos ('valor_custo_log') para as devoluções de cada SKU.
+
+        #### 7️⃣ Risco
+        - **Significado**: Um indicador que quantifica o risco financeiro médio por venda para um SKU, considerando o impacto das devoluções.
+        - **Cálculo**: `Impacto (R$) / Vendas` para cada SKU.
+
+        #### 8️⃣ Classe
+        - **Significado**: Classificação do SKU com base no seu impacto cumulativo nas devoluções. Ajuda a identificar os produtos que mais contribuem para o problema de devoluções (curva ABC).
+        - **Cálculo**: Os SKUs são classificados como 'A' (até 80% do impacto total), 'B' (entre 80% e 95% do impacto total) ou 'C' (acima de 95% do impacto total) com base na análise de Pareto do impacto financeiro das devoluções.
+
+        #### 9️⃣ Top 10 Concentração (%)
+        - **Significado**: O percentual do volume total de devoluções que é representado pelos 10 SKUs com o maior número de devoluções.
+        - **Cálculo**: `(Soma das Devoluções dos Top 10 SKUs / Total de Devoluções) × 100`
+
+        #### 🔟 Top 20 Concentração (%)
+        - **Significado**: O percentual do volume total de devoluções que é representado pelos 20 SKUs com o maior número de devoluções.
+        - **Cálculo**: `(Soma das Devoluções dos Top 20 SKUs / Total de Devoluções) × 100`
+
+        #### 1️⃣1️⃣ SKUs com Devolução
+        - **Significado**: O número total de SKUs únicos que tiveram pelo menos uma devolução registrada no período.
+        - **Cálculo**: Contagem de SKUs distintos que possuem 'is_devolucao' igual a True.
+
         ### 📊 Indicadores de Saúde
 
         | Métrica | Excelente | Bom | Atenção | Crítico |
