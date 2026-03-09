@@ -1029,8 +1029,11 @@ else:
         st.markdown('<div class="simulator-box">', unsafe_allow_html=True)
         st.markdown('<h4 style="margin-top: 0; margin-bottom: 15px;">Simulador de Reducao de Devolucoes</h4>', unsafe_allow_html=True)
         
-        max_slider = int(taxa_atual) if taxa_atual > 0 else 10
-        reducao_pct = st.slider("Reducao desejada (%)", 0, max_slider, min(1, max_slider), key="sim_reducao_pct")
+        # Garantir que o slider tenha um intervalo válido (min < max) e valor padrão dentro do intervalo
+        max_slider = max(1, int(taxa_atual)) if taxa_atual > 0 else 10
+        # O valor padrão (value) deve estar entre min_value (0) e max_value (max_slider)
+        default_val = min(1, max_slider)
+        reducao_pct = st.slider("Redução desejada (%)", 0, max_slider, default_val, key="sim_reducao_pct")
         st.markdown('</div>', unsafe_allow_html=True)
         
         nova_taxa = max(taxa_atual - reducao_pct, 0)
