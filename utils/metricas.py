@@ -10,9 +10,11 @@ def classificar_estado(estado, plataforma='ML'):
     
     if plataforma == 'Shopee':
         # Shopee Status: 'Reembolso Concluído', 'Aprovada', 'Em devolução', etc.
-        if 'aprovad' in estado_lower or 'reembolso concluído' in estado_lower or 'concluído' in estado_lower:
+        # Na Shopee, 'concluído' ou 'aprovada' geralmente significa que o reembolso foi feito.
+        # Se o produto voltou, é saudável. Se não voltou ou foi perda total do valor, é crítica.
+        if 'reembolso concluído' in estado_lower or 'concluído' in estado_lower or 'aprovada' in estado_lower:
             return 'Saudável'
-        if 'disputa' in estado_lower or 'rejeitado' in estado_lower:
+        if 'disputa' in estado_lower or 'rejeitado' in estado_lower or 'cancelado' in estado_lower:
             return 'Crítica'
         return 'Neutra'
     else:
@@ -106,11 +108,20 @@ def calcular_metricas(vendas, matriz, full, max_date, dias_atras):
                 
                 faturamento_devolucoes += reembolso
                 
-                # Custos logísticos (ML)
-                # 'Custo de envio com base nas medidas e peso declarados' é o custo do frete pago pelo vendedor na devolução
-                custo_envio_devolucao = float(dev.get('Custo de envio com base nas medidas e peso declarados', 0) or 0)
-                tarifa_venda = float(dev.get('Tarifa de venda e impostos (BRL)', 0) or 0)
-                perda_parcial_item = abs(custo_envio_devolucao) + abs(tarifa_venda)
+                # Custos logísticos
+                if plataforma == 'Shopee':
+                    # Na Shopee, os custos logísticos podem vir de colunas diferentes
+                    # Usamos os nomes de colunas padrão da Shopee se disponíveis
+                    custo_envio_devolucao = float(dev.get('Taxa de envio pagas pelo comprador', 0) or 0)
+                    # Outras tarifas que podem ser descontadas na devolução
+                    tarifa_venda = float(dev.get('Taxas de transação', 0) or 0) + float(dev.get('Comissão', 0) or 0)
+                    perda_parcial_item = abs(custo_envio_devolucao) + abs(tarifa_venda)
+                else:
+                    # ML
+                    # 'Custo de envio com base nas medidas e peso declarados' é o custo do frete pago pelo vendedor na devolução
+                    custo_envio_devolucao = float(dev.get('Custo de envio com base nas medidas e peso declarados', 0) or 0)
+                    tarifa_venda = float(dev.get('Tarifa de venda e impostos (BRL)', 0) or 0)
+                    perda_parcial_item = abs(custo_envio_devolucao) + abs(tarifa_venda)
                 
                 classe = classificar_estado(dev.get('Estado'), plataforma)
                 if classe == 'Saudável':
