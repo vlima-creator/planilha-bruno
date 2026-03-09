@@ -167,14 +167,20 @@ def analisar_motivos(vendas, matriz, full, max_date, dias_atras):
 
     # Cruzar com SKUs das vendas
     if 'N.º de venda' in todas_dev.columns and 'N.º de venda' in vendas_periodo.columns:
-        vendas_subset = vendas_periodo[['N.º de venda', 'SKU', 'Título do anúncio', 'Descrição do status']].drop_duplicates(subset=['N.º de venda'])
+        # Garantir que as colunas existem antes de selecionar
+        cols_vendas = ['N.º de venda', 'SKU', 'Título do anúncio']
+        if 'Descrição do status' in vendas_periodo.columns:
+            cols_vendas.append('Descrição do status')
+            
+        vendas_subset = vendas_periodo[cols_vendas].drop_duplicates(subset=['N.º de venda'])
         
-        # Se o relatório de devoluções não tem 'Descrição do status', pegar do relatório de vendas
-        if 'Descrição do status' not in todas_dev.columns:
+        # Se o relatório de devoluções não tem 'Descrição do status', pegar do relatório de vendas (se existir)
+        if 'Descrição do status' not in todas_dev.columns and 'Descrição do status' in vendas_subset.columns:
             todas_dev = pd.merge(todas_dev, vendas_subset, on='N.º de venda', how='left')
         else:
-            # Se já tem, mesclar apenas SKU e Título
-            todas_dev = pd.merge(todas_dev, vendas_subset[['N.º de venda', 'SKU', 'Título do anúncio']], on='N.º de venda', how='left')
+            # Se já tem ou não existe na origem, mesclar apenas SKU e Título
+            cols_merge = [c for c in ['N.º de venda', 'SKU', 'Título do anúncio'] if c in vendas_subset.columns]
+            todas_dev = pd.merge(todas_dev, vendas_subset[cols_merge], on='N.º de venda', how='left')
 
     # Aplicar a extração de motivos
     todas_dev['Motivo'] = todas_dev['Motivo'].fillna('Não informado').replace(r'^\s*$', 'Não informado', regex=True)
